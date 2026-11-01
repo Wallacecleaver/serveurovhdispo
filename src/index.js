@@ -190,6 +190,52 @@ async function admin(request, env, path) {
   }
   if (path === '/subs' && request.method === 'GET') return json((await getSubs(env)).map(({ id, email, confirmed, offers }) => ({ id, email, confirmed, offers: offers.length })));
   if (path.startsWith('/subs/') && request.method === 'POST') { await putSubs(env, (await getSubs(env)).filter((s) => s.id !== path.slice(6))); return json({ ok: true }); }
+  if (path === '/verify' && request.method === 'POST') {
+    const cfg = await getCfg(env), s = body.service, v = typeof body.value === 'string' && body.value.trim() ? body.value.trim() : null;
+    const fail = async (m) => { await log(env, 'error', `Vérification ${s} : ${m}`); return json({ error: m }, 400); };
+    const good = async (detail, warn = false, skip = false) => { if (!skip) await log(env, warn ? 'warn' : 'ok', `Vérification ${s} : ${detail}`); return json({ ok: true, detail, warn, skip }); };
+    try {
+      if (s === 'brevo') {
+        const key = v || cfg.brevoKey;
+        if (!key) return fail('Aucune clé saisie ni enregistrée');
+        const r = await fetch('https://api.brevo.com/v3/senders', { headers: { 'api-key': key, accept: 'application/json' } });
+        const txt = await r.text();
+        if (r.status === 401 || r.status === 403) {
+          if (/key not found|invalid|unrecognized/i.test(txt)) return fail('Clé refusée par Brevo (invalide)');
+          return good('Clé acceptée, mais ses permissions sont limitées : impossible de vérifier l\'expéditeur. Utilise « Tester Brevo » (envoi réel).', true);
+        }
+        if (!r.ok) return fail(`Brevo a répondu ${r.status}`);
+        const from = String(body.mailFrom || cfg.mailFrom || '').toLowerCase();
+        if (!from) return good('Clé valide, mais aucune adresse expéditeur renseignée', true);
+        const sd = (JSON.parse(txt).senders || []).find((x) => String(x.email).toLowerCase() === from);
+        if (!sd) return fail(`Clé valide, mais ${from} n'est pas un expéditeur Brevo`);
+        if (sd.active === false) return fail(`Clé valide, mais l'expéditeur ${from} n'est pas encore validé`);
+        return good(`Clé valide · expéditeur ${from} validé`);
+      }
+      if (s === 'hetzner') {
+        const t = v || cfg.hcloud;
+        if (!t) return good('Non configuré (optionnel)', false, true);
+        const r = await fetch('https://api.hetzner.cloud/v1/datacenters', { headers: { authorization: `Bearer ${t}` } });
+        if (r.status === 401 || r.status === 403) return fail('Token refusé par Hetzner');
+        if (!r.ok) return fail(`Hetzner a répondu ${r.status}`);
+        return good(`Token valide · ${(await r.json()).datacenters.length} datacenters visibles`);
+      }
+      if (s === 'discord') {
+        const u = v || cfg.discord;
+        if (!u) return good('Non configuré (optionnel)', false, true);
+        if (!/^https:\/\/(?:canary\.|ptb\.)?discord(?:app)?\.com\/api\/webhooks\/\d+\/[\w-]+$/.test(u)) return fail('URL de webhook Discord invalide');
+        const r = await fetch(u);
+        if (!r.ok) return fail(`Webhook refusé (${r.status}) : supprimé ou mal copié ?`);
+        return good(`Webhook valide · « ${(await r.json()).name || 'sans nom'} »`);
+      }
+      if (s === 'ovh') {
+        const r = await fetch('https://eu.api.ovh.com/v1/order/catalog/public/vps?ovhSubsidiary=FR');
+        if (!r.ok) return fail(`API OVH a répondu ${r.status}`);
+        return good(`API OVH joignable · ${((await r.json()).plans || []).length} plans au catalogue`);
+      }
+      return json({ error: 'Service inconnu' }, 400);
+    } catch (e) { return fail(e.message); }
+  }
   if (path === '/logs' && request.method === 'GET') return json(((await env.KV.get('logs', 'json')) || []).reverse());
   if (path === '/logs/clear' && request.method === 'POST') { await env.KV.delete('logs'); return json({ ok: true }); }
   if (path === '/password' && request.method === 'POST') {

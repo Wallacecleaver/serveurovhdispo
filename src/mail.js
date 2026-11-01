@@ -1,5 +1,5 @@
 export async function sendMail(cfg, { to, subject, html }) {
-  if (!cfg.brevoKey || !cfg.mailFrom) throw new Error('Brevo non configuré (admin)');
+  if (!cfg.brevoKey || !cfg.mailFrom) throw new Error('Brevo non configuré : colle la clé dans Réglages puis clique sur Enregistrer');
   const r = await fetch('https://api.brevo.com/v3/smtp/email', {
     method: 'POST',
     headers: { 'api-key': cfg.brevoKey, 'content-type': 'application/json' },
