@@ -2,7 +2,7 @@
 <body><main class="wrap">
 <h1>RADAR SERVEURS</h1>
 <p class="sub">Alerte mail dès qu'un VPS OVH ou Hetzner (Europe) revient en stock. <span id="last" class="meta"></span></p>
-<form id="f">
+<div id="stats" class="meta" style="margin-bottom:1rem"></div><form id="f">
 <div class="bar" id="bar"><button type="button" class="chip on" data-p="">Tous</button><button type="button" class="chip" data-p="ovh">OVH</button><button type="button" class="chip" data-p="hetzner">Hetzner</button><button type="button" class="chip" id="onlyok">Dispo seulement</button></div>
 <div class="grid" id="list"><div class="meta">Scan en cours…</div></div>
 <h2>Ton email</h2>
@@ -12,13 +12,13 @@
 const $=id=>document.getElementById(id);let all=[],prov='',only=false;
 const mk=(t,p={},...k)=>{const e=Object.assign(document.createElement(t),p);k.forEach(x=>e.append(x));return e};
 function draw(){const sel=new Set([...document.querySelectorAll('input[name=o]:checked')].map(i=>i.value));const l=$('list');l.replaceChildren();
-const rows=all.filter(o=>(!prov||o.provider===prov)&&(!only||o.locations.length));
+const rows=all.filter(o=>(!prov||o.provider===prov)&&(!only||o.locations.length)).sort((a,b)=>(b.locations.length>0)-(a.locations.length>0)||(a.price??1e9)-(b.price??1e9));
 if(!rows.length){l.append(mk('div',{className:'meta',textContent:'Aucune offre à afficher.'}));return}
 for(const o of rows){const ok=o.locations.length>0;const i=mk('input',{type:'checkbox',name:'o',value:o.key,checked:sel.has(o.key)});
 l.append(mk('label',{className:'card offer'},i,mk('b',{textContent:o.label}),mk('span',{className:'meta',textContent:(o.provider==='ovh'?'OVH':'Hetzner')+(o.price?' · '+o.price+' €/mois':'')}),mk('br'),mk('span',{className:'tag '+(ok?'ok':'ko'),textContent:ok?'Dispo · '+o.locations.join(', '):'Indispo'})))}}
 document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{prov=b.dataset.p;document.querySelectorAll('[data-p]').forEach(x=>x.classList.toggle('on',x===b));draw()});
 $('onlyok').onclick=e=>{only=!only;e.target.classList.toggle('on',only);draw()};
-fetch('/api/offers').then(r=>r.json()).then(d=>{all=d.offers;if(d.lastRun)$('last').textContent='Dernier scan : '+new Date(d.lastRun).toLocaleTimeString('fr-FR');draw()}).catch(()=>$('list').textContent='Chargement impossible.');
+fetch('/api/offers').then(r=>r.json()).then(d=>{all=d.offers;if(d.lastRun)$('last').textContent='Dernier scan : '+new Date(d.lastRun).toLocaleTimeString('fr-FR');$('stats').textContent=all.length+' offres suivies · '+all.filter(o=>o.locations.length).length+' dispo maintenant';draw()}).catch(()=>$('list').textContent='Chargement impossible.');
 $('f').onsubmit=async e=>{e.preventDefault();const m=$('msg');m.className='';m.textContent='';
 const offers=[...document.querySelectorAll('input[name=o]:checked')].map(i=>i.value);
 if(!offers.length){m.className='err';m.textContent='Coche au moins une offre.';return}

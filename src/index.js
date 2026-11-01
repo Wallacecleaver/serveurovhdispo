@@ -15,6 +15,13 @@ async function getCfg(env) {
 const mask = (v) => (v ? '••••' + v.slice(-4) : '');
 const getSubs = async (env) => (await env.KV.get('subs', 'json')) || [];
 const putSubs = (env, s) => env.KV.put('subs', JSON.stringify(s));
+async function log(env, level, msg) {
+  try {
+    const l = (await env.KV.get('logs', 'json')) || [];
+    l.push({ t: Date.now(), l: level, m: String(msg).slice(0, 300) });
+    await env.KV.put('logs', JSON.stringify(l.slice(-200)));
+  } catch {}
+}
 const getOffers = async (env) => (await env.KV.get('offers', 'json')) || [];
 
 // ---------- auth ----------
@@ -38,7 +45,7 @@ const sidOf = (r) => (r.headers.get('cookie') || '').match(/(?:^|; )sid=([\w-]+)
 const authed = async (r, env) => { const s = sidOf(r); return !!s && !!(await env.KV.get('sess:' + s)); };
 
 // ---------- verification ----------
-async function runCheck(env) {
+async function runCheck(env, manual = false) {
   const cfg = await getCfg(env);
   const old = await getOffers(env);
   const st = { lastRun: Date.now() };
@@ -55,6 +62,13 @@ async function runCheck(env) {
     }
   }
   await env.KV.put('offers', JSON.stringify(offers));
+  const prev = (await env.KV.get('status', 'json')) || {};
+  for (const n of ['ovh', 'hetzner']) {
+    const a = prev[n], b = st[n];
+    if (!b) continue;
+    if (!b.ok) { if (!(n === 'hetzner' && !cfg.hcloud) && a?.error !== b.error) await log(env, 'error', `${n.toUpperCase()} : ${b.error}`); }
+    else if (!a?.ok || a.available !== b.available || manual) await log(env, b.available ? 'ok' : 'info', `${n.toUpperCase()} : ${b.count} offres, ${b.available} dispo`);
+  }
   await env.KV.put('status', JSON.stringify(st));
   if (cfg.paused) return st;
 
@@ -71,6 +85,7 @@ async function runCheck(env) {
     if (fresh.length) {
       const content = '🚀 **Serveur dispo !**\n' + fresh.map((o) => `• **${o.label}**${o.price ? ` (${o.price} €/mois)` : ''} : ${o.locations.join(', ')}\n${ORDER[o.provider]}`).join('\n');
       await fetch(cfg.discord, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content: content.slice(0, 1900) }) }).catch(() => {});
+      await log(env, 'ok', `Discord : ${fresh.length} offre(s) dispo signalée(s)`);
     }
     await env.KV.put('avail', JSON.stringify(now));
   }
@@ -92,7 +107,8 @@ async function runCheck(env) {
       await sendMail(cfg, { to: sub.email, subject: `Serveur dispo : ${hits.map((h) => h.label.split(' - ')[0]).join(', ')}`, html: `<p>Du stock est disponible :</p><ul>${rows}</ul><p style="color:#888;font-size:12px"><a href="${cfg.publicUrl}/unsubscribe/${sub.id}">Se désinscrire</a></p>` });
       hits.forEach((h) => (sub.notified[h.key] = true));
       changed = true;
-    } catch (e) { st.mailError = e.message; await env.KV.put('status', JSON.stringify(st)); }
+      await log(env, 'ok', `Alerte envoyée à ${sub.email} (${hits.length} offre(s))`);
+    } catch (e) { await log(env, 'error', `Mail à ${sub.email} : ${e.message}`); st.mailError = e.message; await env.KV.put('status', JSON.stringify(st)); }
   }
   if (changed) await putSubs(env, subs);
   return st;
@@ -120,6 +136,7 @@ async function subscribe(request, env, cfg) {
     await sendMail(cfg, { to: email, subject: 'Confirme ton alerte serveur', html: `<p><a href="${cfg.publicUrl}/confirm/${sub.id}">Confirmer mon email</a></p><p style="color:#888;font-size:12px">Si ce n'est pas toi, ignore ce message.</p>` });
   } catch (e) { return json({ error: "Envoi du mail impossible (l'admin doit configurer Brevo)" }, 502); }
   await putSubs(env, subs);
+  await log(env, 'info', `Inscription en attente : ${email}`);
   return json({ ok: true });
 }
 
@@ -134,12 +151,14 @@ async function admin(request, env, path) {
     if (String(body.password || '').length < 10) return json({ error: '10 caractères minimum' }, 400);
     const salt = crypto.randomUUID();
     await env.KV.put('admin', JSON.stringify({ salt, hash: await hashPw(body.password, salt) }));
+    await log(env, 'info', 'Compte admin créé');
     return newSession(env);
   }
   if (path === '/login' && request.method === 'POST') {
     if (!ad) return json({ error: 'Pas encore configuré' }, 400);
     if (await limited(env, 'rl:login:' + ip, 6, 900)) return json({ error: 'Trop d\'essais, attends 15 min' }, 429);
-    if ((await hashPw(String(body.password || ''), ad.salt)) !== ad.hash) return json({ error: 'Mot de passe incorrect' }, 401);
+    if ((await hashPw(String(body.password || ''), ad.salt)) !== ad.hash) { await log(env, 'warn', `Connexion admin refusée (${ip})`); return json({ error: 'Mot de passe incorrect' }, 401); }
+    await log(env, 'info', 'Connexion admin');
     return newSession(env);
   }
   if (!(await authed(request, env))) return json({ error: 'Non connecté' }, 401);
@@ -160,21 +179,25 @@ async function admin(request, env, path) {
     if (typeof body.publicUrl === 'string') c.publicUrl = body.publicUrl.trim().replace(/\/$/, '');
     if (typeof body.paused === 'boolean') c.paused = body.paused;
     await env.KV.put('config', JSON.stringify(c));
+    await log(env, 'info', 'Réglages modifiés : ' + Object.keys(body).join(', '));
     return json({ ok: true });
   }
   if (path === '/status') return json({ status: (await env.KV.get('status', 'json')) || {}, subs: (await getSubs(env)).length });
-  if (path === '/check' && request.method === 'POST') return json(await runCheck(env));
+  if (path === '/check' && request.method === 'POST') { await log(env, 'info', 'Scan manuel lancé'); return json(await runCheck(env, true)); }
   if (path === '/test-mail' && request.method === 'POST') {
-    try { await sendMail(await getCfg(env), { to: String(body.to || ''), subject: 'Test alertes serveurs', html: '<p>✅ Brevo fonctionne.</p>' }); return json({ ok: true }); }
-    catch (e) { return json({ error: e.message }, 502); }
+    try { await sendMail(await getCfg(env), { to: String(body.to || ''), subject: 'Test alertes serveurs', html: '<p>✅ Brevo fonctionne.</p>' }); await log(env, 'ok', 'Mail de test envoyé à ' + body.to); return json({ ok: true }); }
+    catch (e) { await log(env, 'error', 'Test mail : ' + e.message); return json({ error: e.message }, 502); }
   }
   if (path === '/subs' && request.method === 'GET') return json((await getSubs(env)).map(({ id, email, confirmed, offers }) => ({ id, email, confirmed, offers: offers.length })));
   if (path.startsWith('/subs/') && request.method === 'POST') { await putSubs(env, (await getSubs(env)).filter((s) => s.id !== path.slice(6))); return json({ ok: true }); }
+  if (path === '/logs' && request.method === 'GET') return json(((await env.KV.get('logs', 'json')) || []).reverse());
+  if (path === '/logs/clear' && request.method === 'POST') { await env.KV.delete('logs'); return json({ ok: true }); }
   if (path === '/password' && request.method === 'POST') {
     if ((await hashPw(String(body.current || ''), ad.salt)) !== ad.hash) return json({ error: 'Mot de passe actuel incorrect' }, 401);
     if (String(body.next || '').length < 10) return json({ error: '10 caractères minimum' }, 400);
     const salt = crypto.randomUUID();
     await env.KV.put('admin', JSON.stringify({ salt, hash: await hashPw(body.next, salt) }));
+    await log(env, 'info', 'Mot de passe admin changé');
     return json({ ok: true });
   }
   return json({ error: 'Not found' }, 404);
@@ -196,8 +219,9 @@ export default {
     if (m) {
       const subs = await getSubs(env), sub = subs.find((s) => s.id === m[2]);
       if (!sub) return html('Lien invalide ou déjà utilisé.');
-      if (m[1] === 'confirm') { sub.confirmed = true; await putSubs(env, subs); return html('Email confirmé : tu recevras un mail dès qu\'un serveur est dispo.'); }
+      if (m[1] === 'confirm') { sub.confirmed = true; await putSubs(env, subs); await log(env, 'ok', `Email confirmé : ${sub.email}`); return html('Email confirmé : tu recevras un mail dès qu\'un serveur est dispo.'); }
       await putSubs(env, subs.filter((s) => s.id !== sub.id));
+      await log(env, 'info', `Désinscription : ${sub.email}`);
       return html('Tu es désinscrit.');
     }
     return new Response('Not found', { status: 404 });

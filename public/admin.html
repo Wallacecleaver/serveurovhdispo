@@ -1,43 +1,60 @@
 <!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Admin · Radar serveurs</title><link rel="stylesheet" href="/style.css"></head>
-<body><main class="wrap"><h1>CONSOLE ADMIN</h1><p class="sub" id="sub"></p><div id="app"></div></main>
+<body><main class="wrap" style="max-width:1100px"><div id="app"></div></main>
 <script>
 const $=id=>document.getElementById(id);
 const api=async(p,b)=>{const r=await fetch('/api/admin'+p,b===undefined?{}:{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Erreur '+r.status);return d};
-const say=(id,t,ok)=>{const e=$(id);e.className='note '+(ok?'good':'err');e.textContent=t};
-async function boot(){const s=await api('/state');if(!s.authed)return gate(s.setup);panel()}
-function gate(setup){$('sub').textContent=setup?'Connexion':'Première utilisation : choisis ton mot de passe admin (10 caractères min).';
-$('app').innerHTML=`<div class="card" style="max-width:420px"><input type="text" class="pw" autocomplete="off" id="pw" placeholder="Mot de passe"><div class="bar" style="margin-top:.8rem"><button id="go">${setup?'Entrer':'Créer le compte admin'}</button><button type="button" class="ghost" id="eye">Voir</button></div><div id="m" class="note"></div></div>`;
-const go=async()=>{try{await api(setup?'/login':'/setup',{password:$('pw').value});boot()}catch(e){say('m',e.message)}};$('go').onclick=go;$('eye').onclick=()=>$('pw').classList.toggle('show');$('pw').onkeydown=e=>e.key==='Enter'&&go()}
-async function panel(){$('sub').textContent='Tout se règle ici, rien à mettre dans un fichier.';
-$('app').innerHTML=`<h2>Statut</h2><div class="card"><div id="st">…</div><div class="bar" style="margin-top:.8rem"><button id="chk">Scanner maintenant</button><button class="ghost" id="pause"></button><button class="ghost" id="out">Déconnexion</button></div><div id="n1" class="note"></div></div>
-<h2>Réglages</h2><div class="card"><div class="row2">
-<div><label class="f">Clé API Brevo</label><input type="text" class="pw" autocomplete="off" id="brevoKey" autocomplete="off"></div>
-<div><label class="f">Adresse expéditeur (validée dans Brevo)</label><input type="text" id="mailFrom"></div>
-<div><label class="f">Token Hetzner (lecture seule)</label><input type="text" class="pw" autocomplete="off" id="hcloud" autocomplete="off"></div>
-<div><label class="f">Webhook Discord (alertes directes, optionnel)</label><input type="text" class="pw" autocomplete="off" id="discord" autocomplete="off"></div>
-<div><label class="f">URL publique</label><input type="url" id="publicUrl"></div></div>
-<p class="meta">Un champ secret vide = inchangé. Pour en supprimer un, tape <b>-</b>.</p>
-<button id="save">Enregistrer</button><div id="n2" class="note"></div>
-<div class="bar" style="margin-top:1rem"><input type="email" id="to" placeholder="Envoyer un mail de test à…" style="max-width:300px"><button class="ghost" id="tm">Tester Brevo</button></div><div id="n3" class="note"></div></div>
-<h2>Inscrits</h2><div class="card" id="subs">…</div>
-<h2>Mot de passe</h2><div class="card"><div class="row2"><input type="text" class="pw" autocomplete="off" id="cur" placeholder="Actuel"><input type="text" class="pw" autocomplete="off" id="nxt" placeholder="Nouveau (10+)"></div><button id="cp" style="margin-top:.8rem">Changer</button><div id="n4" class="note"></div></div>`;
-const SEC=['brevoKey','hcloud','discord'];
-const cfg=await api('/config');let paused=cfg.paused;
-for(const k of ['brevoKey','hcloud','discord','mailFrom','publicUrl']){const e=$(k);if(SEC.includes(k))e.placeholder=cfg[k]||'non configuré';else e.value=cfg[k]}
-const pl=()=>$('pause').textContent=paused?'▶ Reprendre les alertes':'⏸ Pause des alertes';pl();
-$('pause').onclick=async()=>{paused=!paused;await api('/config',{paused});pl()};
-$('out').onclick=async()=>{await api('/logout',{});boot()};
-$('save').onclick=async()=>{const b={mailFrom:$('mailFrom').value,publicUrl:$('publicUrl').value};for(const k of SEC){const v=$(k).value.trim();if(v==='-')b[k]=null;else if(v)b[k]=v}
-try{await api('/config',b);say('n2','Enregistré ✔',1);for(const k of SEC)$(k).value='';panel()}catch(e){say('n2',e.message)}};
-$('tm').onclick=async()=>{try{await api('/test-mail',{to:$('to').value});say('n3','Mail de test envoyé ✔',1)}catch(e){say('n3',e.message)}};
-$('cp').onclick=async()=>{try{await api('/password',{current:$('cur').value,next:$('nxt').value});say('n4','Mot de passe changé ✔',1)}catch(e){say('n4',e.message)}};
-$('chk').onclick=async()=>{$('chk').disabled=true;say('n1','Scan en cours…',1);try{await api('/check',{});say('n1','Scan terminé ✔',1);stat()}catch(e){say('n1',e.message)}$('chk').disabled=false};
-stat();subsList()}
-async function stat(){const {status:s,subs}=await api('/status');const f=(n,x)=>x?(x.ok?`<span class="tag ok">${n} · ${x.count} offres, ${x.available} dispo</span>`:`<span class="tag ko">${n} · ${x.error}</span>`):'';
-$('st').innerHTML=`<div class="meta">Dernier scan : ${s.lastRun?new Date(s.lastRun).toLocaleString('fr-FR'):'jamais'} · ${subs} inscrit(s)</div><div class="bar">${f('OVH',s.ovh)} ${f('Hetzner',s.hetzner)}</div>${s.mailError?`<div class="err">Dernière erreur mail : ${s.mailError.replace(/</g,'&lt;')}</div>`:''}`}
-async function subsList(){const l=await api('/subs');const b=$('subs');if(!l.length){b.textContent='Aucun inscrit.';return}
-b.innerHTML='<table><tr><th>Email</th><th>Statut</th><th>Offres</th><th></th></tr>'+l.map(s=>`<tr><td></td><td>${s.confirmed?'confirmé':'en attente'}</td><td>${s.offers}</td><td><button class="red" data-id="${s.id}">Supprimer</button></td></tr>`).join('')+'</table>';
-b.querySelectorAll('tr').forEach((tr,i)=>{if(i)tr.firstChild.textContent=l[i-1].email});
-b.querySelectorAll('button').forEach(x=>x.onclick=async()=>{await api('/subs/'+x.dataset.id,{});subsList()})}
+const mk=(t,p={},...k)=>{const e=Object.assign(document.createElement(t),p);k.forEach(x=>e.append(x));return e};
+const note=(id,t,ok)=>{const e=$(id);if(e){e.className='note '+(ok?'good':'err');e.textContent=t}};
+const fmt=t=>new Date(t).toLocaleString('fr-FR');
+const field=(id,label,secret,ph)=>mk('div',{},mk('label',{className:'f',htmlFor:id,textContent:label}),mk('input',{id,type:'text',className:secret?'pw':'',autocomplete:'off',placeholder:ph||''}));
+const section=(title,desc,...k)=>mk('div',{className:'card sec'},mk('h3',{textContent:title}),mk('p',{textContent:desc}),...k);
+
+async function boot(){const s=await api('/state');s.authed?shell():gate(s.setup)}
+function gate(setup){const a=$('app');a.replaceChildren(mk('h1',{textContent:'CONSOLE ADMIN'}),mk('p',{className:'sub',textContent:setup?'Connexion':'Première utilisation : choisis ton mot de passe admin (10 caractères min).'}),
+mk('div',{className:'card',style:'max-width:420px'},mk('input',{id:'pw',type:'text',className:'pw',autocomplete:'off',placeholder:'Mot de passe'}),mk('div',{className:'bar',style:'margin-top:.8rem'},mk('button',{id:'go',textContent:setup?'Entrer':'Créer le compte admin'}),mk('button',{type:'button',className:'ghost',id:'eye',textContent:'Voir'})),mk('div',{id:'m',className:'note'})));
+const go=async()=>{try{await api(setup?'/login':'/setup',{password:$('pw').value});boot()}catch(e){note('m',e.message)}};
+$('go').onclick=go;$('eye').onclick=()=>$('pw').classList.toggle('show');$('pw').onkeydown=e=>e.key==='Enter'&&go()}
+
+const VIEWS=[['dash','◈','Vue d\u2019ensemble'],['cfg','⚙','Réglages'],['subs','✉','Inscrits'],['logs','☰','Journal'],['sec','🔒','Sécurité']];
+function shell(){const side=mk('nav',{className:'card side'},mk('b',{textContent:'RADAR'}));
+for(const [id,ic,l] of VIEWS)side.append(mk('button',{className:'nav',id:'n-'+id,textContent:ic+'  '+l,onclick:()=>show(id)}));
+$('app').replaceChildren(mk('div',{className:'app'},side,mk('div',{id:'view'})));show('dash')}
+function show(v){VIEWS.forEach(([id])=>$('n-'+id).classList.toggle('on',id===v));$('view').replaceChildren(mk('h1',{textContent:VIEWS.find(x=>x[0]===v)[2]}));({dash,cfg,subs,logs,sec})[v]()}
+
+async function dash(){const {status:s,subs}=await api('/status');const c=await api('/config');
+const tot=(s.ovh?.count||0)+(s.hetzner?.count||0),av=(s.ovh?.available||0)+(s.hetzner?.available||0);
+const st=(l,v,t)=>mk('div',{className:'card stat'},mk('b',{textContent:v}),mk('span',{textContent:l}));
+const tag=(n,x)=>x?mk('span',{className:'tag '+(x.ok?'ok':'ko'),style:'margin-right:1rem',textContent:x.ok?`${n} · ${x.count} offres · ${x.available} dispo`:`${n} · ${x.error}`}):'';
+const v=$('view');
+v.append(mk('div',{className:'stats'},st('Offres suivies',tot),st('Dispo maintenant',av),st('Inscrits',subs),st('Dernier scan',s.lastRun?new Date(s.lastRun).toLocaleTimeString('fr-FR'):'—')),
+section('Fournisseurs',c.paused?'⏸ Alertes en pause : les scans continuent mais rien n\u2019est envoyé.':'Surveillance active, scan toutes les 5 minutes.',mk('div',{},tag('OVH',s.ovh),tag('Hetzner',s.hetzner)),s.mailError?mk('div',{className:'err',style:'margin-top:.6rem',textContent:'Dernière erreur mail : '+s.mailError}):'',
+mk('div',{className:'bar',style:'margin-top:1rem'},mk('button',{id:'chk',textContent:'Scanner maintenant',onclick:async e=>{e.target.disabled=true;note('n1','Scan en cours…',1);try{await api('/check',{});show('dash')}catch(x){note('n1',x.message);e.target.disabled=false}}}),
+mk('button',{className:'ghost',textContent:c.paused?'▶ Reprendre les alertes':'⏸ Mettre en pause',onclick:async()=>{await api('/config',{paused:!c.paused});show('dash')}})),mk('div',{id:'n1',className:'note'})))}
+
+async function cfg(){const c=await api('/config');const v=$('view');
+const ph=x=>x||'non configuré';
+v.append(section('Envoi des mails (Brevo)','Sert aux mails de confirmation et d\u2019alerte.',mk('div',{className:'row2'},field('brevoKey','Clé API',1,ph(c.brevoKey)),field('mailFrom','Adresse expéditeur (validée dans Brevo)',0)),
+mk('div',{className:'bar',style:'margin-top:1rem'},mk('input',{id:'to',type:'email',placeholder:'Envoyer un mail de test à…',style:'max-width:300px'}),mk('button',{className:'ghost',textContent:'Tester Brevo',onclick:async()=>{try{await api('/test-mail',{to:$('to').value});note('n3','Mail de test envoyé ✔',1)}catch(e){note('n3',e.message)}}})),mk('div',{id:'n3',className:'note'})),
+section('Hetzner Cloud','Token API en lecture seule, nécessaire pour surveiller Hetzner.',field('hcloud','Token',1,ph(c.hcloud))),
+section('Discord (optionnel)','Message direct dès qu\u2019une offre passe en dispo, sans passer par les mails.',field('discord','URL du webhook',1,ph(c.discord))),
+section('Général','',field('publicUrl','URL publique du site (liens des mails)',0)),
+mk('div',{className:'bar'},mk('button',{textContent:'Enregistrer',onclick:async()=>{const b={mailFrom:$('mailFrom').value,publicUrl:$('publicUrl').value};for(const k of ['brevoKey','hcloud','discord']){const x=$(k).value.trim();if(x==='-')b[k]=null;else if(x)b[k]=x}
+try{await api('/config',b);note('n2','Enregistré ✔',1);setTimeout(()=>show('cfg'),700)}catch(e){note('n2',e.message)}}}),mk('span',{className:'meta',textContent:'Champ secret vide = inchangé · tape « - » pour le supprimer'})),mk('div',{id:'n2',className:'note'}));
+$('mailFrom').value=c.mailFrom;$('publicUrl').value=c.publicUrl}
+
+async function subs(){const l=await api('/subs');const v=$('view');
+if(!l.length)return v.append(mk('div',{className:'card',textContent:'Aucun inscrit pour le moment.'}));
+const t=mk('table',{},mk('tr',{},...['Email','Statut','Offres',''].map(x=>mk('th',{textContent:x}))));
+for(const s of l)t.append(mk('tr',{},mk('td',{textContent:s.email}),mk('td',{textContent:s.confirmed?'✔ confirmé':'en attente'}),mk('td',{textContent:s.offers}),mk('td',{},mk('button',{className:'red',textContent:'Supprimer',onclick:async()=>{if(confirm('Supprimer '+s.email+' ?')){await api('/subs/'+s.id,{});show('subs')}}}))));
+v.append(mk('div',{className:'card',style:'overflow-x:auto'},t))}
+
+async function logs(){const l=await api('/logs');const v=$('view');
+const box=mk('div',{className:'card'});
+if(!l.length)box.textContent='Journal vide pour le moment.';
+for(const e of l)box.append(mk('div',{className:'lg'},mk('time',{textContent:fmt(e.t)}),mk('span',{className:'lv '+e.l,textContent:e.l}),mk('span',{textContent:e.m})));
+v.append(mk('div',{className:'bar'},mk('button',{className:'ghost',textContent:'↻ Actualiser',onclick:()=>show('logs')}),mk('button',{className:'ghost',textContent:'Vider',onclick:async()=>{if(confirm('Vider le journal ?')){await api('/logs/clear',{});show('logs')}}}),mk('span',{className:'meta',textContent:'200 derniers événements'})),box)}
+
+function sec(){$('view').append(section('Mot de passe','10 caractères minimum.',mk('div',{className:'row2'},field('cur','Actuel',1),field('nxt','Nouveau',1)),mk('button',{style:'margin-top:1rem',textContent:'Changer',onclick:async()=>{try{await api('/password',{current:$('cur').value,next:$('nxt').value});note('n4','Mot de passe changé ✔',1)}catch(e){note('n4',e.message)}}}),mk('div',{id:'n4',className:'note'})),
+section('Session','Tu restes connecté 7 jours.',mk('button',{className:'ghost',textContent:'Déconnexion',onclick:async()=>{await api('/logout',{});boot()}})))}
 boot();
 </script></body></html>
