@@ -1,8 +1,17 @@
 import { fetchOvh } from './ovh.js';
 import { fetchHetzner } from './hetzner.js';
+import { fetchKimsufi } from './kimsufi.js';
+import { fetchScaleway } from './scaleway.js';
 import { sendMail, esc } from './mail.js';
 
-const ORDER = { ovh: 'https://www.ovhcloud.com/fr/vps/', hetzner: 'https://console.hetzner.cloud/' };
+// Fournisseurs surveilles. `needs` = champ de config requis (sinon le fournisseur est ignore).
+const PROVIDERS = [
+  { id: 'ovh', name: 'OVH VPS', order: 'https://www.ovhcloud.com/fr/vps/', run: () => fetchOvh() },
+  { id: 'kimsufi', name: 'Kimsufi / OVH dédiés', order: 'https://eco.ovhcloud.com/fr/', run: () => fetchKimsufi() },
+  { id: 'hetzner', name: 'Hetzner Cloud', order: 'https://console.hetzner.cloud/', needs: 'hcloud', run: (c) => fetchHetzner(c.hcloud) },
+  { id: 'scaleway', name: 'Scaleway', order: 'https://console.scaleway.com/instance/servers/create', needs: 'scaleway', run: (c) => fetchScaleway(c.scaleway) },
+];
+const ORDER = Object.fromEntries(PROVIDERS.map((p) => [p.id, p.order]));
 const json = (d, s = 200, h = {}) => new Response(JSON.stringify(d), { status: s, headers: { 'content-type': 'application/json', ...h } });
 const html = (msg) => new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="stylesheet" href="/style.css"><body><main class="wrap"><div class="card"><p>${esc(msg)}</p><a href="/">← Retour</a></div></main>`, { headers: { 'content-type': 'text/html; charset=utf-8' } });
 
@@ -10,7 +19,7 @@ const html = (msg) => new Response(`<!doctype html><meta charset="utf-8"><meta n
 const rawCfg = async (env) => (await env.KV.get('config', 'json')) || {};
 async function getCfg(env) {
   const c = await rawCfg(env);
-  return { brevoKey: c.brevoKey || env.BREVO_API_KEY, mailFrom: c.mailFrom || (/exemple\.com/.test(env.MAIL_FROM || '') ? '' : env.MAIL_FROM), hcloud: c.hcloud || env.HCLOUD_TOKEN, discord: c.discord || '', publicUrl: c.publicUrl || (/TON-SOUS/.test(env.PUBLIC_URL || '') ? '' : env.PUBLIC_URL || ''), paused: !!c.paused };
+  return { brevoKey: c.brevoKey || env.BREVO_API_KEY, mailFrom: c.mailFrom || (/exemple\.com/.test(env.MAIL_FROM || '') ? '' : env.MAIL_FROM), hcloud: c.hcloud || env.HCLOUD_TOKEN, scaleway: c.scaleway || env.SCW_SECRET_KEY, replyTo: c.replyTo || '', mailName: c.mailName || '', discord: c.discord || '', publicUrl: c.publicUrl || (/TON-SOUS/.test(env.PUBLIC_URL || '') ? '' : env.PUBLIC_URL || ''), paused: !!c.paused };
 }
 const mask = (v) => (v ? '••••' + v.slice(-4) : '');
 const getSubs = async (env) => (await env.KV.get('subs', 'json')) || [];
@@ -49,24 +58,26 @@ async function runCheck(env, manual = false) {
   const cfg = await getCfg(env);
   const old = await getOffers(env);
   const st = { lastRun: Date.now() };
-  const [ovh, het] = await Promise.allSettled([fetchOvh(), cfg.hcloud ? fetchHetzner(cfg.hcloud) : Promise.reject(new Error('Token Hetzner non configuré'))]);
+  const results = await Promise.allSettled(PROVIDERS.map((p) => (p.needs && !cfg[p.needs] ? Promise.reject(new Error('NOCFG')) : p.run(cfg))));
   const failed = new Set(), offers = [];
-  for (const [name, res] of [['ovh', ovh], ['hetzner', het]]) {
+  PROVIDERS.forEach((p, i) => {
+    const res = results[i];
     if (res.status === 'fulfilled') {
       offers.push(...res.value);
-      st[name] = { ok: true, count: res.value.length, available: res.value.filter((o) => o.locations.length).length };
+      st[p.id] = { ok: true, count: res.value.length, available: res.value.filter((o) => o.locations.length).length };
     } else {
-      failed.add(name);
-      st[name] = { ok: false, error: res.reason?.message || 'erreur' };
-      if (!(name === 'hetzner' && !cfg.hcloud)) offers.push(...old.filter((o) => o.provider === name));
+      failed.add(p.id);
+      if (res.reason?.message === 'NOCFG') { st[p.id] = { ok: false, skipped: true, error: 'Non configuré' }; return; }
+      st[p.id] = { ok: false, error: res.reason?.message || 'erreur' };
+      offers.push(...old.filter((o) => o.provider === p.id));
     }
-  }
+  });
   await env.KV.put('offers', JSON.stringify(offers));
   const prev = (await env.KV.get('status', 'json')) || {};
-  for (const n of ['ovh', 'hetzner']) {
+  for (const { id: n } of PROVIDERS) {
     const a = prev[n], b = st[n];
-    if (!b) continue;
-    if (!b.ok) { if (!(n === 'hetzner' && !cfg.hcloud) && a?.error !== b.error) await log(env, 'error', `${n.toUpperCase()} : ${b.error}`); }
+    if (!b || b.skipped) continue;
+    if (!b.ok) { if (a?.error !== b.error) await log(env, 'error', `${n.toUpperCase()} : ${b.error}`); }
     else if (!a?.ok || a.available !== b.available || manual) await log(env, b.available ? 'ok' : 'info', `${n.toUpperCase()} : ${b.count} offres, ${b.available} dispo`);
   }
   await env.KV.put('status', JSON.stringify(st));
@@ -122,7 +133,7 @@ async function subscribe(request, env, cfg) {
   const email = String(b.email || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) return json({ error: 'Email invalide' }, 400);
   const known = new Set((await getOffers(env)).map((o) => o.key));
-  const wanted = [...new Set(b.offers || [])].filter((k) => known.has(k)).slice(0, 40);
+  const wanted = [...new Set(b.offers || [])].filter((k) => known.has(k)).slice(0, 150);
   if (!wanted.length) return json({ error: 'Choisis au moins une offre' }, 400);
   const subs = await getSubs(env);
   let sub = subs.find((s) => s.email === email);
@@ -167,15 +178,17 @@ async function admin(request, env, path) {
   if (path === '/logout') { await env.KV.delete('sess:' + sidOf(request)); return json({ ok: true }, 200, { 'set-cookie': 'sid=; Max-Age=0; Path=/' }); }
   if (path === '/config' && request.method === 'GET') {
     const c = await getCfg(env);
-    return json({ brevoKey: mask(c.brevoKey), hcloud: mask(c.hcloud), discord: mask(c.discord), mailFrom: c.mailFrom || '', publicUrl: c.publicUrl, paused: c.paused });
+    return json({ brevoKey: mask(c.brevoKey), hcloud: mask(c.hcloud), scaleway: mask(c.scaleway), discord: mask(c.discord), mailFrom: c.mailFrom || '', replyTo: c.replyTo || '', mailName: c.mailName || '', publicUrl: c.publicUrl, paused: c.paused });
   }
   if (path === '/config' && request.method === 'POST') {
     const c = await rawCfg(env);
-    for (const k of ['brevoKey', 'hcloud', 'discord']) {
+    for (const k of ['brevoKey', 'hcloud', 'scaleway', 'discord']) {
       if (body[k] === null) delete c[k];
       else if (typeof body[k] === 'string' && body[k].trim()) c[k] = body[k].trim();
     }
     if (typeof body.mailFrom === 'string') c.mailFrom = body.mailFrom.trim();
+    if (typeof body.replyTo === 'string') c.replyTo = body.replyTo.trim();
+    if (typeof body.mailName === 'string') c.mailName = body.mailName.trim().slice(0, 60);
     if (typeof body.publicUrl === 'string') c.publicUrl = body.publicUrl.trim().replace(/\/$/, '');
     if (typeof body.paused === 'boolean') c.paused = body.paused;
     await env.KV.put('config', JSON.stringify(c));
@@ -220,6 +233,19 @@ async function admin(request, env, path) {
         if (!r.ok) return fail(`Hetzner a répondu ${r.status}`);
         return good(`Token valide · ${(await r.json()).datacenters.length} datacenters visibles`);
       }
+      if (s === 'scaleway') {
+        const t = v || cfg.scaleway;
+        if (!t) return good('Non configuré (optionnel)', false, true);
+        const r = await fetch('https://api.scaleway.com/instance/v1/zones/fr-par-1/products/servers/availability', { headers: { 'X-Auth-Token': t } });
+        if (r.status === 401 || r.status === 403) return fail('Clé refusée par Scaleway');
+        if (!r.ok) return fail(`Scaleway a répondu ${r.status}`);
+        return good(`Clé valide · ${Object.keys((await r.json()).servers || {}).length} types de serveurs lisibles`);
+      }
+      if (s === 'kimsufi') {
+        const r = await fetch('https://eu.api.ovh.com/v1/dedicated/server/datacenter/availabilities?planCode=24ska01');
+        if (!r.ok) return fail(`API OVH dédiés a répondu ${r.status}`);
+        return good('API OVH dédiés (Kimsufi) joignable');
+      }
       if (s === 'discord') {
         const u = v || cfg.discord;
         if (!u) return good('Non configuré (optionnel)', false, true);
@@ -258,7 +284,7 @@ export default {
     if (p === '/api/offers') {
       let offers = await getOffers(env);
       if (!offers.length) await runCheck(env), (offers = await getOffers(env));
-      return json({ offers, lastRun: ((await env.KV.get('status', 'json')) || {}).lastRun || null });
+      return json({ providers: PROVIDERS.filter((p) => offers.some((o) => o.provider === p.id)).map(({ id, name }) => ({ id, name })), offers, lastRun: ((await env.KV.get('status', 'json')) || {}).lastRun || null });
     }
     if (p === '/api/subscribe' && request.method === 'POST') return subscribe(request, env, cfg);
     const m = p.match(/^\/(confirm|unsubscribe)\/([0-9a-f-]{36})$/);
