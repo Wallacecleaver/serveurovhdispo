@@ -6,21 +6,21 @@ const api=async(p,b)=>{const r=await fetch('/api/admin'+p,b===undefined?{}:{meth
 const say=(id,t,ok)=>{const e=$(id);e.className='note '+(ok?'good':'err');e.textContent=t};
 async function boot(){const s=await api('/state');if(!s.authed)return gate(s.setup);panel()}
 function gate(setup){$('sub').textContent=setup?'Connexion':'Première utilisation : choisis ton mot de passe admin (10 caractères min).';
-$('app').innerHTML=`<div class="card" style="max-width:420px"><input type="password" id="pw" placeholder="Mot de passe" autocomplete="${setup?'current-password':'new-password'}"><button id="go" style="margin-top:.8rem">${setup?'Entrer':'Créer le compte admin'}</button><div id="m" class="note"></div></div>`;
-const go=async()=>{try{await api(setup?'/login':'/setup',{password:$('pw').value});boot()}catch(e){say('m',e.message)}};$('go').onclick=go;$('pw').onkeydown=e=>e.key==='Enter'&&go()}
+$('app').innerHTML=`<div class="card" style="max-width:420px"><input type="text" class="pw" autocomplete="off" id="pw" placeholder="Mot de passe"><div class="bar" style="margin-top:.8rem"><button id="go">${setup?'Entrer':'Créer le compte admin'}</button><button type="button" class="ghost" id="eye">Voir</button></div><div id="m" class="note"></div></div>`;
+const go=async()=>{try{await api(setup?'/login':'/setup',{password:$('pw').value});boot()}catch(e){say('m',e.message)}};$('go').onclick=go;$('eye').onclick=()=>$('pw').classList.toggle('show');$('pw').onkeydown=e=>e.key==='Enter'&&go()}
 async function panel(){$('sub').textContent='Tout se règle ici, rien à mettre dans un fichier.';
 $('app').innerHTML=`<h2>Statut</h2><div class="card"><div id="st">…</div><div class="bar" style="margin-top:.8rem"><button id="chk">Scanner maintenant</button><button class="ghost" id="pause"></button><button class="ghost" id="out">Déconnexion</button></div><div id="n1" class="note"></div></div>
 <h2>Réglages</h2><div class="card"><div class="row2">
-<div><label class="f">Clé API Brevo</label><input type="password" id="brevoKey" autocomplete="off"></div>
+<div><label class="f">Clé API Brevo</label><input type="text" class="pw" autocomplete="off" id="brevoKey" autocomplete="off"></div>
 <div><label class="f">Adresse expéditeur (validée dans Brevo)</label><input type="text" id="mailFrom"></div>
-<div><label class="f">Token Hetzner (lecture seule)</label><input type="password" id="hcloud" autocomplete="off"></div>
-<div><label class="f">Webhook Discord (alertes directes, optionnel)</label><input type="password" id="discord" autocomplete="off"></div>
+<div><label class="f">Token Hetzner (lecture seule)</label><input type="text" class="pw" autocomplete="off" id="hcloud" autocomplete="off"></div>
+<div><label class="f">Webhook Discord (alertes directes, optionnel)</label><input type="text" class="pw" autocomplete="off" id="discord" autocomplete="off"></div>
 <div><label class="f">URL publique</label><input type="url" id="publicUrl"></div></div>
 <p class="meta">Un champ secret vide = inchangé. Pour en supprimer un, tape <b>-</b>.</p>
 <button id="save">Enregistrer</button><div id="n2" class="note"></div>
 <div class="bar" style="margin-top:1rem"><input type="email" id="to" placeholder="Envoyer un mail de test à…" style="max-width:300px"><button class="ghost" id="tm">Tester Brevo</button></div><div id="n3" class="note"></div></div>
 <h2>Inscrits</h2><div class="card" id="subs">…</div>
-<h2>Mot de passe</h2><div class="card"><div class="row2"><input type="password" id="cur" placeholder="Actuel"><input type="password" id="nxt" placeholder="Nouveau (10+)"></div><button id="cp" style="margin-top:.8rem">Changer</button><div id="n4" class="note"></div></div>`;
+<h2>Mot de passe</h2><div class="card"><div class="row2"><input type="text" class="pw" autocomplete="off" id="cur" placeholder="Actuel"><input type="text" class="pw" autocomplete="off" id="nxt" placeholder="Nouveau (10+)"></div><button id="cp" style="margin-top:.8rem">Changer</button><div id="n4" class="note"></div></div>`;
 const SEC=['brevoKey','hcloud','discord'];
 const cfg=await api('/config');let paused=cfg.paused;
 for(const k of ['brevoKey','hcloud','discord','mailFrom','publicUrl']){const e=$(k);if(SEC.includes(k))e.placeholder=cfg[k]||'non configuré';else e.value=cfg[k]}

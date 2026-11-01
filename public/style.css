@@ -32,3 +32,5 @@ label.f{display:block;font-size:.8rem;color:var(--mut);margin-bottom:.3rem}
 table{width:100%;border-collapse:collapse;font-size:.9rem}td,th{text-align:left;padding:.5rem;border-bottom:1px solid var(--line)}
 a{color:var(--c1)}
 @media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+.pw{-webkit-text-security:disc;text-security:disc}.pw.show{-webkit-text-security:none;text-security:none}
