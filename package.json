@@ -1,0 +1,13 @@
+{
+  "name": "serveurovhdispo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Alertes mail quand un VPS OVH (EU) ou Hetzner Cloud (EU) redevient disponible",
+  "scripts": {
+    "dev": "wrangler dev --test-scheduled",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

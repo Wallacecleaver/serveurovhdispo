@@ -1,0 +1,22 @@
+name = "serveurovhdispo"
+main = "src/index.js"
+compatibility_date = "2025-01-01"
+
+[assets]
+directory = "./public"
+
+# Verification toutes les 5 minutes
+[triggers]
+crons = ["*/5 * * * *"]
+
+# Cree le KV avec : npx wrangler kv namespace create KV
+# puis colle l'id ici
+[[kv_namespaces]]
+binding = "KV"
+id = "REMPLACE_PAR_L_ID_DU_KV"
+
+[vars]
+# Adresse expediteur (doit etre validee dans Brevo)
+MAIL_FROM = "toi@exemple.com"
+# URL publique du worker (pour les liens de confirmation / desinscription)
+PUBLIC_URL = "https://serveurovhdispo.TON-SOUS-DOMAINE.workers.dev"
