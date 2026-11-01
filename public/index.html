@@ -1,92 +1,26 @@
-<!doctype html>
-<html lang="fr">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Alertes serveurs OVH / Hetzner</title>
-<style>
-  :root { --bg:#fff; --fg:#1a1a1a; --muted:#666; --card:#f5f6f8; --line:#dde0e5; --ok:#168a45; --ko:#b3261e; --accent:#2557d6; }
-  @media (prefers-color-scheme: dark) { :root { --bg:#14161a; --fg:#eceef1; --muted:#9aa0a8; --card:#1d2026; --line:#2d3139; --ok:#4cc380; --ko:#f2736b; --accent:#6c93ff; } }
-  * { box-sizing:border-box; }
-  body { margin:0; font:16px/1.5 system-ui,sans-serif; background:var(--bg); color:var(--fg); }
-  main { max-width:680px; margin:0 auto; padding:2rem 1rem 4rem; }
-  h1 { font-size:1.5rem; margin:0 0 .25rem; }
-  .sub { color:var(--muted); margin:0 0 1.5rem; }
-  h2 { font-size:1.05rem; margin:1.5rem 0 .5rem; }
-  label.row { display:flex; gap:.6rem; align-items:center; padding:.6rem .75rem; background:var(--card); border:1px solid var(--line); border-radius:8px; margin-bottom:.4rem; cursor:pointer; }
-  label.row .name { flex:1; }
-  .loc { font-size:.8rem; color:var(--muted); }
-  .badge { font-size:.75rem; font-weight:600; padding:.1rem .5rem; border-radius:99px; border:1px solid currentColor; }
-  .badge.ok { color:var(--ok); } .badge.ko { color:var(--ko); }
-  input[type=email] { width:100%; padding:.7rem; font-size:1rem; border:1px solid var(--line); border-radius:8px; background:var(--card); color:var(--fg); }
-  button { margin-top:1rem; padding:.75rem 1.25rem; font-size:1rem; border:0; border-radius:8px; background:var(--accent); color:#fff; cursor:pointer; }
-  button:disabled { opacity:.5; }
-  #msg { margin-top:1rem; min-height:1.5rem; }
-  #msg.err { color:var(--ko); } #msg.good { color:var(--ok); }
-</style>
-</head>
-<body>
-<main>
-  <h1>Alertes serveurs</h1>
-  <p class="sub">Un mail dès qu'un VPS OVH (Europe) ou Hetzner Cloud (Europe) est de nouveau disponible. Vérification toutes les 5 minutes.</p>
-
-  <form id="f">
-    <div id="list">Chargement…</div>
-    <h2>Ton email</h2>
-    <input type="email" id="email" placeholder="toi@exemple.com" required autocomplete="email">
-    <button id="btn" type="submit">M'alerter</button>
-    <div id="msg" role="status"></div>
-  </form>
-</main>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Radar serveurs</title><link rel="stylesheet" href="/style.css"></head>
+<body><main class="wrap">
+<h1>RADAR SERVEURS</h1>
+<p class="sub">Alerte mail dès qu'un VPS OVH ou Hetzner (Europe) revient en stock. <span id="last" class="meta"></span></p>
+<form id="f">
+<div class="bar" id="bar"><button type="button" class="chip on" data-p="">Tous</button><button type="button" class="chip" data-p="ovh">OVH</button><button type="button" class="chip" data-p="hetzner">Hetzner</button><button type="button" class="chip" id="onlyok">Dispo seulement</button></div>
+<div class="grid" id="list"><div class="meta">Scan en cours…</div></div>
+<h2>Ton email</h2>
+<div class="card"><input type="email" id="email" placeholder="toi@exemple.com" required autocomplete="email"><button id="btn" style="margin-top:.8rem">Activer l'alerte</button><div id="msg" role="status"></div></div>
+</form></main>
 <script>
-const $ = (id) => document.getElementById(id);
-const NAMES = { ovh: 'OVH', hetzner: 'Hetzner Cloud' };
-
-function el(tag, props = {}, ...kids) {
-  const e = Object.assign(document.createElement(tag), props);
-  kids.forEach((k) => e.append(k));
-  return e;
-}
-
-async function load() {
-  try {
-    const offers = await (await fetch('/api/offers')).json();
-    const list = $('list');
-    list.replaceChildren();
-    if (!offers.length) { list.textContent = 'Aucune offre trouvée pour le moment.'; return; }
-    for (const provider of ['ovh', 'hetzner']) {
-      const group = offers.filter((o) => o.provider === provider);
-      if (!group.length) continue;
-      list.append(el('h2', { textContent: NAMES[provider] }));
-      for (const o of group) {
-        const ok = o.locations.length > 0;
-        list.append(el('label', { className: 'row' },
-          el('input', { type: 'checkbox', value: o.key, name: 'offer' }),
-          el('span', { className: 'name' },
-            o.label + (o.price ? ` · ${o.price} €/mois` : ''),
-            ok ? el('div', { className: 'loc', textContent: o.locations.join(', ') }) : ''),
-          el('span', { className: 'badge ' + (ok ? 'ok' : 'ko'), textContent: ok ? 'Dispo' : 'Indispo' })));
-      }
-    }
-  } catch { $('list').textContent = 'Impossible de charger les offres.'; }
-}
-
-$('f').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const offers = [...document.querySelectorAll('input[name=offer]:checked')].map((i) => i.value);
-  const msg = $('msg'); msg.className = ''; msg.textContent = '';
-  if (!offers.length) { msg.className = 'err'; msg.textContent = 'Coche au moins une offre.'; return; }
-  $('btn').disabled = true;
-  try {
-    const r = await fetch('/api/subscribe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: $('email').value, offers }) });
-    const d = await r.json();
-    if (!r.ok) throw new Error(d.error || 'Erreur');
-    msg.className = 'good'; msg.textContent = 'Presque fini : clique sur le lien dans le mail de confirmation.';
-  } catch (err) { msg.className = 'err'; msg.textContent = err.message; }
-  $('btn').disabled = false;
-});
-
-load();
-</script>
-</body>
-</html>
+const $=id=>document.getElementById(id);let all=[],prov='',only=false;
+const mk=(t,p={},...k)=>{const e=Object.assign(document.createElement(t),p);k.forEach(x=>e.append(x));return e};
+function draw(){const sel=new Set([...document.querySelectorAll('input[name=o]:checked')].map(i=>i.value));const l=$('list');l.replaceChildren();
+const rows=all.filter(o=>(!prov||o.provider===prov)&&(!only||o.locations.length));
+if(!rows.length){l.append(mk('div',{className:'meta',textContent:'Aucune offre à afficher.'}));return}
+for(const o of rows){const ok=o.locations.length>0;const i=mk('input',{type:'checkbox',name:'o',value:o.key,checked:sel.has(o.key)});
+l.append(mk('label',{className:'card offer'},i,mk('b',{textContent:o.label}),mk('span',{className:'meta',textContent:(o.provider==='ovh'?'OVH':'Hetzner')+(o.price?' · '+o.price+' €/mois':'')}),mk('br'),mk('span',{className:'tag '+(ok?'ok':'ko'),textContent:ok?'Dispo · '+o.locations.join(', '):'Indispo'})))}}
+document.querySelectorAll('[data-p]').forEach(b=>b.onclick=()=>{prov=b.dataset.p;document.querySelectorAll('[data-p]').forEach(x=>x.classList.toggle('on',x===b));draw()});
+$('onlyok').onclick=e=>{only=!only;e.target.classList.toggle('on',only);draw()};
+fetch('/api/offers').then(r=>r.json()).then(d=>{all=d.offers;if(d.lastRun)$('last').textContent='Dernier scan : '+new Date(d.lastRun).toLocaleTimeString('fr-FR');draw()}).catch(()=>$('list').textContent='Chargement impossible.');
+$('f').onsubmit=async e=>{e.preventDefault();const m=$('msg');m.className='';m.textContent='';
+const offers=[...document.querySelectorAll('input[name=o]:checked')].map(i=>i.value);
+if(!offers.length){m.className='err';m.textContent='Coche au moins une offre.';return}
+$('btn').disabled=true;try{const r=await fetch('/api/subscribe',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('email').value,offers})});const d=await r.json();if(!r.ok)throw Error(d.error||'Erreur');m.className='good';m.textContent='Presque fini : clique sur le lien dans le mail de confirmation (vérifie les spams).'}catch(x){m.className='err';m.textContent=x.message}$('btn').disabled=false};
+</script></body></html>

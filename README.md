@@ -38,3 +38,7 @@ Le site est ensuite disponible sur l'URL `*.workers.dev` affichée par wrangler.
 - Hetzner : `/datacenters` filtré sur la zone `eu-central` (Nuremberg, Falkenstein, Helsinki), types « shared ».
 - Un mail est envoyé quand une offre surveillée passe en dispo. Quand elle repasse indispo, l'alerte se réarme.
 - Inscription avec confirmation par mail, lien de désinscription dans chaque alerte.
+
+## Console admin
+
+Va sur `/admin` juste après le déploiement : au premier accès, tu choisis ton mot de passe admin (fais-le tout de suite). Ensuite tout se règle depuis la console : clé Brevo, adresse expéditeur, token Hetzner, webhook Discord, pause des alertes, liste des inscrits, scan manuel et mail de test. Les valeurs sont stockées dans le KV, plus besoin de `wrangler secret`.

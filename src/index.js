@@ -2,152 +2,205 @@ import { fetchOvh } from './ovh.js';
 import { fetchHetzner } from './hetzner.js';
 import { sendMail, esc } from './mail.js';
 
-const MAX_SUBS = 200;
-const MAX_OFFERS_PER_SUB = 30;
-const ORDER_URL = {
-  ovh: 'https://www.ovhcloud.com/fr/vps/',
-  hetzner: 'https://console.hetzner.cloud/',
-};
+const ORDER = { ovh: 'https://www.ovhcloud.com/fr/vps/', hetzner: 'https://console.hetzner.cloud/' };
+const json = (d, s = 200, h = {}) => new Response(JSON.stringify(d), { status: s, headers: { 'content-type': 'application/json', ...h } });
+const html = (msg) => new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="stylesheet" href="/style.css"><body><main class="wrap"><div class="card"><p>${esc(msg)}</p><a href="/">← Retour</a></div></main>`, { headers: { 'content-type': 'text/html; charset=utf-8' } });
 
-const json = (data, status = 200) =>
-  new Response(JSON.stringify(data), { status, headers: { 'content-type': 'application/json' } });
-const page = (msg) =>
-  new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><body style="font-family:system-ui;max-width:480px;margin:4rem auto;padding:0 1rem"><p>${esc(msg)}</p><p><a href="/">Retour</a></p>`, {
-    headers: { 'content-type': 'text/html; charset=utf-8' },
-  });
-
+// ---------- config (KV d'abord, variables d'env en secours) ----------
+const rawCfg = async (env) => (await env.KV.get('config', 'json')) || {};
+async function getCfg(env) {
+  const c = await rawCfg(env);
+  return { brevoKey: c.brevoKey || env.BREVO_API_KEY, mailFrom: c.mailFrom || (/exemple\.com/.test(env.MAIL_FROM || '') ? '' : env.MAIL_FROM), hcloud: c.hcloud || env.HCLOUD_TOKEN, discord: c.discord || '', publicUrl: c.publicUrl || (/TON-SOUS/.test(env.PUBLIC_URL || '') ? '' : env.PUBLIC_URL || ''), paused: !!c.paused };
+}
+const mask = (v) => (v ? '••••' + v.slice(-4) : '');
 const getSubs = async (env) => (await env.KV.get('subs', 'json')) || [];
-const putSubs = (env, subs) => env.KV.put('subs', JSON.stringify(subs));
+const putSubs = (env, s) => env.KV.put('subs', JSON.stringify(s));
 const getOffers = async (env) => (await env.KV.get('offers', 'json')) || [];
 
-// ---------- Verification des disponibilites ----------
-async function refreshOffers(env) {
+// ---------- auth ----------
+const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, '0')).join('');
+async function hashPw(pw, salt) {
+  const k = await crypto.subtle.importKey('raw', new TextEncoder().encode(pw), 'PBKDF2', false, ['deriveBits']);
+  return hex(await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: new TextEncoder().encode(salt), iterations: 100000 }, k, 256));
+}
+async function limited(env, key, max, ttl) {
+  const n = +((await env.KV.get(key)) || 0);
+  if (n >= max) return true;
+  await env.KV.put(key, String(n + 1), { expirationTtl: ttl });
+  return false;
+}
+async function newSession(env) {
+  const sid = crypto.randomUUID() + crypto.randomUUID();
+  await env.KV.put('sess:' + sid, '1', { expirationTtl: 7 * 86400 });
+  return json({ ok: true }, 200, { 'set-cookie': `sid=${sid}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${7 * 86400}` });
+}
+const sidOf = (r) => (r.headers.get('cookie') || '').match(/(?:^|; )sid=([\w-]+)/)?.[1];
+const authed = async (r, env) => { const s = sidOf(r); return !!s && !!(await env.KV.get('sess:' + s)); };
+
+// ---------- verification ----------
+async function runCheck(env) {
+  const cfg = await getCfg(env);
   const old = await getOffers(env);
-  const [ovh, het] = await Promise.allSettled([fetchOvh(), fetchHetzner(env.HCLOUD_TOKEN)]);
-  const failed = new Set();
-  const offers = [];
+  const st = { lastRun: Date.now() };
+  const [ovh, het] = await Promise.allSettled([fetchOvh(), cfg.hcloud ? fetchHetzner(cfg.hcloud) : Promise.reject(new Error('Token Hetzner non configuré'))]);
+  const failed = new Set(), offers = [];
   for (const [name, res] of [['ovh', ovh], ['hetzner', het]]) {
-    if (res.status === 'fulfilled') offers.push(...res.value);
-    else {
-      console.log(`${name} KO:`, res.reason?.message);
+    if (res.status === 'fulfilled') {
+      offers.push(...res.value);
+      st[name] = { ok: true, count: res.value.length, available: res.value.filter((o) => o.locations.length).length };
+    } else {
       failed.add(name);
-      offers.push(...old.filter((o) => o.provider === name)); // on garde l'ancien etat
+      st[name] = { ok: false, error: res.reason?.message || 'erreur' };
+      if (!(name === 'hetzner' && !cfg.hcloud)) offers.push(...old.filter((o) => o.provider === name));
     }
   }
   await env.KV.put('offers', JSON.stringify(offers));
-  return { offers, failed };
-}
+  await env.KV.put('status', JSON.stringify(st));
+  if (cfg.paused) return st;
 
-function alertHtml(env, hits, id) {
-  const rows = hits
-    .map(
-      (o) =>
-        `<li><b>${esc(o.label)}</b>${o.price ? ` - ${o.price} €/mois` : ''}<br>Disponible : ${esc(o.locations.join(', '))}<br><a href="${ORDER_URL[o.provider]}">Commander chez ${o.provider === 'ovh' ? 'OVH' : 'Hetzner'}</a></li>`,
-    )
-    .join('');
-  return `<p>Bonne nouvelle, du stock est disponible :</p><ul>${rows}</ul><p style="color:#888;font-size:12px"><a href="${env.PUBLIC_URL}/unsubscribe/${id}">Se desinscrire</a></p>`;
-}
-
-async function runCheck(env) {
-  const { offers, failed } = await refreshOffers(env);
   const byKey = Object.fromEntries(offers.map((o) => [o.key, o]));
+  // Discord : alerte globale sur toute offre qui passe en dispo
+  if (cfg.discord) {
+    const prev = (await env.KV.get('avail', 'json')) || {};
+    const now = {}, fresh = [];
+    for (const o of offers) {
+      now[o.key] = o.locations.length > 0;
+      if (now[o.key] && !prev[o.key] && !failed.has(o.provider)) fresh.push(o);
+    }
+    for (const k of Object.keys(prev)) if (failed.has(byKey[k]?.provider)) now[k] = prev[k];
+    if (fresh.length) {
+      const content = '🚀 **Serveur dispo !**\n' + fresh.map((o) => `• **${o.label}**${o.price ? ` (${o.price} €/mois)` : ''} : ${o.locations.join(', ')}\n${ORDER[o.provider]}`).join('\n');
+      await fetch(cfg.discord, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ content: content.slice(0, 1900) }) }).catch(() => {});
+    }
+    await env.KV.put('avail', JSON.stringify(now));
+  }
+  // Mails
   const subs = await getSubs(env);
   let changed = false;
-
   for (const sub of subs) {
     if (!sub.confirmed) continue;
     const hits = [];
     for (const key of sub.offers) {
       const o = byKey[key];
-      if (!o || failed.has(o.provider)) continue; // pas d'info fiable, on ne touche a rien
-      if (o.locations.length) {
-        if (!sub.notified[key]) hits.push(o);
-      } else if (sub.notified[key]) {
-        delete sub.notified[key]; // de nouveau indispo : on pourra re-alerter
-        changed = true;
-      }
+      if (!o || failed.has(o.provider)) continue;
+      if (o.locations.length) { if (!sub.notified[key]) hits.push(o); }
+      else if (sub.notified[key]) { delete sub.notified[key]; changed = true; }
     }
     if (!hits.length) continue;
     try {
-      await sendMail(env, {
-        to: sub.email,
-        subject: `Serveur dispo : ${hits.map((h) => h.label.split(' - ')[0]).join(', ')}`,
-        html: alertHtml(env, hits, sub.id),
-      });
+      const rows = hits.map((o) => `<li><b>${esc(o.label)}</b>${o.price ? ` - ${o.price} €/mois` : ''}<br>Disponible : ${esc(o.locations.join(', '))}<br><a href="${ORDER[o.provider]}">Commander</a></li>`).join('');
+      await sendMail(cfg, { to: sub.email, subject: `Serveur dispo : ${hits.map((h) => h.label.split(' - ')[0]).join(', ')}`, html: `<p>Du stock est disponible :</p><ul>${rows}</ul><p style="color:#888;font-size:12px"><a href="${cfg.publicUrl}/unsubscribe/${sub.id}">Se désinscrire</a></p>` });
       hits.forEach((h) => (sub.notified[h.key] = true));
       changed = true;
-    } catch (e) {
-      console.log('mail KO', sub.email, e.message); // on retentera au prochain passage
-    }
+    } catch (e) { st.mailError = e.message; await env.KV.put('status', JSON.stringify(st)); }
   }
   if (changed) await putSubs(env, subs);
+  return st;
 }
 
-// ---------- Routes HTTP ----------
-async function subscribe(request, env) {
-  let body;
-  try { body = await request.json(); } catch { return json({ error: 'Requete invalide' }, 400); }
-  const email = String(body.email || '').trim().toLowerCase();
+// ---------- public ----------
+async function subscribe(request, env, cfg) {
+  const ip = request.headers.get('cf-connecting-ip') || 'x';
+  if (await limited(env, 'rl:sub:' + ip, 8, 3600)) return json({ error: 'Trop de tentatives, réessaie plus tard' }, 429);
+  let b; try { b = await request.json(); } catch { return json({ error: 'Requête invalide' }, 400); }
+  const email = String(b.email || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) return json({ error: 'Email invalide' }, 400);
-
   const known = new Set((await getOffers(env)).map((o) => o.key));
-  const wanted = [...new Set(body.offers || [])].filter((k) => known.has(k));
+  const wanted = [...new Set(b.offers || [])].filter((k) => known.has(k)).slice(0, 40);
   if (!wanted.length) return json({ error: 'Choisis au moins une offre' }, 400);
-  if (wanted.length > MAX_OFFERS_PER_SUB) return json({ error: `${MAX_OFFERS_PER_SUB} offres maximum` }, 400);
-
   const subs = await getSubs(env);
   let sub = subs.find((s) => s.email === email);
   if (!sub) {
-    if (subs.length >= MAX_SUBS) return json({ error: 'Trop d\'inscrits pour le moment' }, 503);
+    if (subs.length >= 300) return json({ error: 'Complet pour le moment' }, 503);
     sub = { id: crypto.randomUUID(), email, confirmed: false, offers: [], notified: {} };
     subs.push(sub);
   }
-  sub.offers = wanted;
-  sub.notified = {};
-
+  sub.offers = wanted; sub.notified = {};
   try {
-    await sendMail(env, {
-      to: email,
-      subject: 'Confirme ton alerte serveur',
-      html: `<p>Clique pour activer tes alertes :</p><p><a href="${env.PUBLIC_URL}/confirm/${sub.id}">Confirmer mon email</a></p><p style="color:#888;font-size:12px">Si ce n'est pas toi, ignore ce message.</p>`,
-    });
-  } catch (e) {
-    console.log('confirm mail KO', e.message);
-    return json({ error: "Impossible d'envoyer le mail de confirmation" }, 502);
-  }
+    await sendMail(cfg, { to: email, subject: 'Confirme ton alerte serveur', html: `<p><a href="${cfg.publicUrl}/confirm/${sub.id}">Confirmer mon email</a></p><p style="color:#888;font-size:12px">Si ce n'est pas toi, ignore ce message.</p>` });
+  } catch (e) { return json({ error: "Envoi du mail impossible (l'admin doit configurer Brevo)" }, 502); }
   await putSubs(env, subs);
   return json({ ok: true });
 }
 
+// ---------- admin ----------
+async function admin(request, env, path) {
+  const ad = await env.KV.get('admin', 'json');
+  if (path === '/state') return json({ setup: !!ad, authed: await authed(request, env) });
+  const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
+  const ip = request.headers.get('cf-connecting-ip') || 'x';
+  if (path === '/setup' && request.method === 'POST') {
+    if (ad) return json({ error: 'Déjà configuré' }, 403);
+    if (String(body.password || '').length < 10) return json({ error: '10 caractères minimum' }, 400);
+    const salt = crypto.randomUUID();
+    await env.KV.put('admin', JSON.stringify({ salt, hash: await hashPw(body.password, salt) }));
+    return newSession(env);
+  }
+  if (path === '/login' && request.method === 'POST') {
+    if (!ad) return json({ error: 'Pas encore configuré' }, 400);
+    if (await limited(env, 'rl:login:' + ip, 6, 900)) return json({ error: 'Trop d\'essais, attends 15 min' }, 429);
+    if ((await hashPw(String(body.password || ''), ad.salt)) !== ad.hash) return json({ error: 'Mot de passe incorrect' }, 401);
+    return newSession(env);
+  }
+  if (!(await authed(request, env))) return json({ error: 'Non connecté' }, 401);
+  if (request.method === 'POST' && new URL(request.headers.get('origin') || 'http://x').host !== new URL(request.url).host) return json({ error: 'Origine refusée' }, 403);
+
+  if (path === '/logout') { await env.KV.delete('sess:' + sidOf(request)); return json({ ok: true }, 200, { 'set-cookie': 'sid=; Max-Age=0; Path=/' }); }
+  if (path === '/config' && request.method === 'GET') {
+    const c = await getCfg(env);
+    return json({ brevoKey: mask(c.brevoKey), hcloud: mask(c.hcloud), discord: mask(c.discord), mailFrom: c.mailFrom || '', publicUrl: c.publicUrl, paused: c.paused });
+  }
+  if (path === '/config' && request.method === 'POST') {
+    const c = await rawCfg(env);
+    for (const k of ['brevoKey', 'hcloud', 'discord']) {
+      if (body[k] === null) delete c[k];
+      else if (typeof body[k] === 'string' && body[k].trim()) c[k] = body[k].trim();
+    }
+    if (typeof body.mailFrom === 'string') c.mailFrom = body.mailFrom.trim();
+    if (typeof body.publicUrl === 'string') c.publicUrl = body.publicUrl.trim().replace(/\/$/, '');
+    if (typeof body.paused === 'boolean') c.paused = body.paused;
+    await env.KV.put('config', JSON.stringify(c));
+    return json({ ok: true });
+  }
+  if (path === '/status') return json({ status: (await env.KV.get('status', 'json')) || {}, subs: (await getSubs(env)).length });
+  if (path === '/check' && request.method === 'POST') return json(await runCheck(env));
+  if (path === '/test-mail' && request.method === 'POST') {
+    try { await sendMail(await getCfg(env), { to: String(body.to || ''), subject: 'Test alertes serveurs', html: '<p>✅ Brevo fonctionne.</p>' }); return json({ ok: true }); }
+    catch (e) { return json({ error: e.message }, 502); }
+  }
+  if (path === '/subs' && request.method === 'GET') return json((await getSubs(env)).map(({ id, email, confirmed, offers }) => ({ id, email, confirmed, offers: offers.length })));
+  if (path.startsWith('/subs/') && request.method === 'POST') { await putSubs(env, (await getSubs(env)).filter((s) => s.id !== path.slice(6))); return json({ ok: true }); }
+  if (path === '/password' && request.method === 'POST') {
+    if ((await hashPw(String(body.current || ''), ad.salt)) !== ad.hash) return json({ error: 'Mot de passe actuel incorrect' }, 401);
+    if (String(body.next || '').length < 10) return json({ error: '10 caractères minimum' }, 400);
+    const salt = crypto.randomUUID();
+    await env.KV.put('admin', JSON.stringify({ salt, hash: await hashPw(body.next, salt) }));
+    return json({ ok: true });
+  }
+  return json({ error: 'Not found' }, 404);
+}
+
 export default {
   async fetch(request, env) {
-    const url = new URL(request.url);
-    const { pathname } = url;
-
-    if (pathname === '/api/offers') {
+    const url = new URL(request.url), p = url.pathname;
+    if (p.startsWith('/api/admin/')) return admin(request, env, p.slice(10));
+    const cfg = await getCfg(env);
+    if (!cfg.publicUrl) { const c = await rawCfg(env); c.publicUrl = url.origin; await env.KV.put('config', JSON.stringify(c)); cfg.publicUrl = url.origin; }
+    if (p === '/api/offers') {
       let offers = await getOffers(env);
-      if (!offers.length) offers = (await refreshOffers(env)).offers; // premier lancement
-      return json(offers);
+      if (!offers.length) await runCheck(env), (offers = await getOffers(env));
+      return json({ offers, lastRun: ((await env.KV.get('status', 'json')) || {}).lastRun || null });
     }
-    if (pathname === '/api/subscribe' && request.method === 'POST') return subscribe(request, env);
-
-    const m = pathname.match(/^\/(confirm|unsubscribe)\/([0-9a-f-]{36})$/);
+    if (p === '/api/subscribe' && request.method === 'POST') return subscribe(request, env, cfg);
+    const m = p.match(/^\/(confirm|unsubscribe)\/([0-9a-f-]{36})$/);
     if (m) {
-      const subs = await getSubs(env);
-      const sub = subs.find((s) => s.id === m[2]);
-      if (!sub) return page('Lien invalide ou deja utilise.');
-      if (m[1] === 'confirm') {
-        sub.confirmed = true;
-        await putSubs(env, subs);
-        return page('Email confirme, tu recevras un mail des qu\'un serveur est dispo.');
-      }
+      const subs = await getSubs(env), sub = subs.find((s) => s.id === m[2]);
+      if (!sub) return html('Lien invalide ou déjà utilisé.');
+      if (m[1] === 'confirm') { sub.confirmed = true; await putSubs(env, subs); return html('Email confirmé : tu recevras un mail dès qu\'un serveur est dispo.'); }
       await putSubs(env, subs.filter((s) => s.id !== sub.id));
-      return page('Tu es desinscrit.');
+      return html('Tu es désinscrit.');
     }
     return new Response('Not found', { status: 404 });
   },
-
-  async scheduled(_event, env, ctx) {
-    ctx.waitUntil(runCheck(env));
-  },
+  async scheduled(_e, env, ctx) { ctx.waitUntil(runCheck(env)); },
 };
