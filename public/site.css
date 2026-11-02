@@ -140,13 +140,13 @@ details p{margin:.5rem 0 0;color:var(--mut)}
 .topnav .helpbtn .q{width:20px;height:20px;font-size:.78rem}
 /* fenetre d'aide a onglets */
 dialog .in{max-height:calc(100vh - 3rem);overflow-y:auto}
-dialog .hdr{position:sticky;top:0;z-index:1;margin:-1.3rem -1.4rem .8rem;padding:1.3rem 1.4rem .7rem;background:var(--panel)}
+dialog .hdr{position:sticky;top:-1.3rem;z-index:2;margin:-1.3rem -1.4rem 1.1rem;padding:1.3rem 1.4rem 1rem;background:var(--panel);border-radius:18px 18px 0 0;box-shadow:0 10px 12px -8px var(--panel)}
 dialog .hdr .hd{margin-bottom:.8rem}
 .tabs{display:flex;gap:3px;padding:3px;background:var(--bg);border:1px solid var(--line);border-radius:12px}
 .tabs button{flex:1;padding:.55rem .6rem;font-family:inherit;font-size:.88rem;font-weight:600;color:var(--mut);background:transparent;border:0;border-radius:9px;cursor:pointer}
 .tabs button:hover{color:var(--fg)}
 .tabs button[aria-selected=true]{color:#04121a;background:var(--cy)}
-.how .intro{margin:0 0 .4rem;color:#b9bfe6}
+.how .intro{margin:0 0 .6rem;padding-top:.2rem;color:#b9bfe6}
 .cgu h2{font:700 1.02rem var(--head);margin:1.3rem 0 .3rem;color:var(--fg)}
 .cgu p{margin:0 0 .7rem;color:var(--mut);font-size:.93rem}
 .cgu .lede{margin:0 0 .4rem;font-size:.9rem}
