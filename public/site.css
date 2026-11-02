@@ -150,4 +150,5 @@ dialog .hdr .hd{margin-bottom:.8rem}
 .cgu h2{font:700 1.02rem var(--head);margin:1.3rem 0 .3rem;color:var(--fg)}
 .cgu p{margin:0 0 .7rem;color:var(--mut);font-size:.93rem}
 .cgu .lede{margin:0 0 .4rem;font-size:.9rem}
-@media(max-width:480px){.topnav .seg{padding:.45rem .75rem;font-size:.85rem}}
+.topnav .dc img{display:block;width:22px;height:22px;border-radius:6px}
+@media(max-width:480px){.topnav .seg{padding:.45rem .75rem;font-size:.85rem}.topnav .ic{display:none}.topnav .dc .lbl{display:none}}
