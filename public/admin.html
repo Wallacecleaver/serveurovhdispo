@@ -15,9 +15,9 @@ const field=(id,label,secret,ph)=>mk('div',{},mk('label',{className:'f',htmlFor:
 const section=(title,desc,...k)=>mk('div',{className:'card sec'},mk('h3',{textContent:title}),mk('p',{textContent:desc}),...k);
 
 async function boot(){const s=await api('/state');s.authed?shell():gate(s.setup)}
-function gate(setup){const a=$('app');a.replaceChildren(mk('h1',{textContent:'CONSOLE ADMIN'}),mk('p',{className:'sub',textContent:setup?'Connexion':'Première utilisation : choisis ton mot de passe admin (10 caractères min).'}),
-mk('div',{className:'card',style:'max-width:420px'},mk('input',{id:'pw',type:'password',autocomplete:setup?'current-password':'new-password',placeholder:'Mot de passe'}),mk('div',{className:'bar',style:'margin-top:.8rem'},mk('button',{id:'go',textContent:setup?'Entrer':'Créer le compte admin'}),mk('button',{type:'button',className:'ghost',id:'eye',textContent:'Voir'})),mk('div',{id:'m',className:'note'})),credit());
-const go=async()=>{try{await api(setup?'/login':'/setup',{password:$('pw').value});boot()}catch(e){note('m',e.message)}};
+function gate(setup){const a=$('app');a.replaceChildren(mk('h1',{textContent:'CONSOLE ADMIN'}),mk('p',{className:'sub',textContent:'Connexion'}),
+mk('div',{className:'card',style:'max-width:420px'},mk('input',{id:'pw',type:'password',autocomplete:'current-password',placeholder:'Mot de passe'}),mk('div',{className:'bar',style:'margin-top:.8rem'},mk('button',{id:'go',textContent:'Entrer'}),mk('button',{type:'button',className:'ghost',id:'eye',textContent:'Voir'})),mk('div',{id:'m',className:'note'})),credit());
+const go=async()=>{try{await api('/login',{password:$('pw').value});boot()}catch(e){note('m',e.message)}};
 $('pw').focus();$('go').onclick=go;$('eye').onclick=()=>{const i=$('pw');const v=i.type==='password';i.type=v?'text':'password';$('eye').textContent=v?'Cacher':'Voir';i.focus()};$('pw').onkeydown=e=>e.key==='Enter'&&go()}
 
 const VIEWS=[['dash','◈','Vue d\u2019ensemble'],['cfg','⚙','Réglages'],['subs','✉','Inscrits'],['logs','☰','Journal'],['sec','🔒','Sécurité']];
@@ -78,7 +78,7 @@ for(const e of r)box.append(mk('div',{className:'lg'},mk('time',{textContent:fmt
 v.append(mk('div',{className:'bar'},mk('button',{className:'ghost',textContent:'↻ Actualiser',onclick:()=>show('logs')}),mk('button',{className:'ghost',textContent:'Vider',onclick:async()=>{if(confirm('Vider le journal ?')){await api('/logs/clear',{});toast('Journal vidé');show('logs')}}}),mk('input',{type:'text',placeholder:'Filtrer…',style:'max-width:220px',oninput:e=>{q=e.target.value.trim().toLowerCase();draw()}}),mk('span',{className:'meta',textContent:'200 derniers événements'})),
 mk('div',{className:'bar'},chips([['all','Tous'],['error','Erreurs'],['warn','Alertes'],['ok','OK'],['info','Infos']],f,k=>{f=k;draw()})),box);draw()}
 
-function sec(){$('view').append(section('Mot de passe','10 caractères minimum.',mk('div',{className:'row2'},field('cur','Actuel',1),field('nxt','Nouveau',1)),mk('button',{style:'margin-top:1rem',textContent:'Changer',onclick:async()=>{try{await api('/password',{current:$('cur').value,next:$('nxt').value});note('n4','Mot de passe changé ✔',1)}catch(e){note('n4',e.message)}}}),mk('div',{id:'n4',className:'note'})),
+function sec(){$('view').append(section('Mot de passe','Défini dans wrangler.toml (ADMIN_PASSWORD), puis npx wrangler deploy pour le changer.'),
 section('Session','Tu restes connecté 7 jours.',mk('button',{className:'ghost',textContent:'Déconnexion',onclick:async()=>{await api('/logout',{});boot()}})))}
 boot();
 </script></body></html>

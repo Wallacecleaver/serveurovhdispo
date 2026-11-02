@@ -341,22 +341,16 @@ async function manage(request, env, cfg, path, ctx) {
 
 // ---------- admin ----------
 async function admin(request, env, path) {
-  const ad = await env.KV.get('admin', 'json');
-  if (path === '/state') return json({ setup: !!ad, authed: await authed(request, env) });
+  // le mot de passe admin vient de wrangler.toml ([vars] ADMIN_PASSWORD)
+  const pw = String(env.ADMIN_PASSWORD || '');
+  if (path === '/state') return json({ setup: true, configured: !!pw, authed: await authed(request, env) });
   const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
   const ip = request.headers.get('cf-connecting-ip') || 'x';
-  if (path === '/setup' && request.method === 'POST') {
-    if (ad) return json({ error: 'Déjà configuré' }, 403);
-    if (String(body.password || '').length < 10) return json({ error: '10 caractères minimum' }, 400);
-    const salt = crypto.randomUUID();
-    await env.KV.put('admin', JSON.stringify({ salt, hash: await hashPw(body.password, salt) }));
-    await log(env, 'info', 'Compte admin créé');
-    return newSession(env);
-  }
   if (path === '/login' && request.method === 'POST') {
-    if (!ad) return json({ error: 'Pas encore configuré' }, 400);
+    if (!pw) return json({ error: 'ADMIN_PASSWORD absent de wrangler.toml' }, 400);
     if (await limited(env, 'rl:login:' + ip, 6, 900)) return json({ error: 'Trop d\'essais, attends 15 min' }, 429);
-    if ((await hashPw(String(body.password || ''), ad.salt)) !== ad.hash) { await log(env, 'warn', `Connexion admin refusée (${ip})`); return json({ error: 'Mot de passe incorrect' }, 401); }
+    const salt = 'admin-login';
+    if ((await hashPw(String(body.password || ''), salt)) !== (await hashPw(pw, salt))) { await log(env, 'warn', `Connexion admin refusée (${ip})`); return json({ error: 'Mot de passe incorrect' }, 401); }
     await log(env, 'info', 'Connexion admin');
     return newSession(env);
   }
@@ -413,8 +407,8 @@ async function admin(request, env, path) {
       }),
       run(async () => {
         if (!env.KV) return { state: 'ko', detail: 'Binding KV « KV » absent (wrangler.toml)' };
-        const ad = await env.KV.get('admin', 'json');
-        return { state: 'ok', detail: 'KV relié · lecture OK' + (ad ? ' · accès admin présent' : '') };
+        await env.KV.get('config');
+        return { state: 'ok', detail: 'KV relié · lecture OK' + (env.ADMIN_PASSWORD ? ' · mot de passe admin défini (wrangler.toml)' : ' · ADMIN_PASSWORD manquant') };
       }),
     ]);
     return json({ services: [{ id: 'brevo', name: 'API Brevo', ...brevo }, { id: 'd1', name: 'Base D1', ...d1 }, { id: 'kv', name: 'KV', ...kv }], t: Date.now() });
@@ -492,14 +486,6 @@ async function admin(request, env, path) {
   }
   if (path === '/logs' && request.method === 'GET') return json(((await (await db(env)).prepare('SELECT t, l, m FROM logs ORDER BY id DESC LIMIT 200').all()).results) || []);
   if (path === '/logs/clear' && request.method === 'POST') { await (await db(env)).prepare('DELETE FROM logs').run(); return json({ ok: true }); }
-  if (path === '/password' && request.method === 'POST') {
-    if ((await hashPw(String(body.current || ''), ad.salt)) !== ad.hash) return json({ error: 'Mot de passe actuel incorrect' }, 401);
-    if (String(body.next || '').length < 10) return json({ error: '10 caractères minimum' }, 400);
-    const salt = crypto.randomUUID();
-    await env.KV.put('admin', JSON.stringify({ salt, hash: await hashPw(body.next, salt) }));
-    await log(env, 'info', 'Mot de passe admin changé');
-    return json({ ok: true });
-  }
   return json({ error: 'Not found' }, 404);
 }
 

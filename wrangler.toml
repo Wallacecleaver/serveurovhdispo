@@ -30,3 +30,5 @@ id = "REMPLACE_PAR_L_ID_DU_KV"
 MAIL_FROM = "toi@exemple.com"
 # URL publique du worker (pour les liens de confirmation / desinscription)
 PUBLIC_URL = "https://serveurovhdispo.TON-SOUS-DOMAINE.workers.dev"
+# Mot de passe de la console admin (change-le ici puis : npx wrangler deploy)
+ADMIN_PASSWORD = "CHANGE_MOI"
