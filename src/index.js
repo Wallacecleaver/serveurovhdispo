@@ -1,7 +1,7 @@
 import { fetchOvh } from './ovh.js';
 import { fetchHetzner } from './hetzner.js';
 import { fetchScaleway } from './scaleway.js';
-import { sendMail, esc } from './mail.js';
+import { sendMail, esc, confirmMail, alertMail, testMail } from './mail.js';
 
 // Fournisseurs surveilles. `needs` = champ de config requis (sinon le fournisseur est ignore).
 const PROVIDERS = [
@@ -10,6 +10,7 @@ const PROVIDERS = [
   { id: 'scaleway', name: 'Scaleway', order: 'https://console.scaleway.com/instance/servers/create', needs: 'scaleway', run: (c) => fetchScaleway(c.scaleway) },
 ];
 const ORDER = Object.fromEntries(PROVIDERS.map((p) => [p.id, p.order]));
+const PNAME = Object.fromEntries(PROVIDERS.map((p) => [p.id, p.name]));
 const json = (d, s = 200, h = {}) => new Response(JSON.stringify(d), { status: s, headers: { 'content-type': 'application/json', ...h } });
 const html = (msg) => new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="stylesheet" href="/style.css"><body><main class="wrap"><div class="card"><p>${esc(msg)}</p><a href="/">← Retour</a></div></main>`, { headers: { 'content-type': 'text/html; charset=utf-8' } });
 
@@ -112,8 +113,8 @@ async function runCheck(env, manual = false) {
     }
     if (!hits.length) continue;
     try {
-      const rows = hits.map((o) => `<li><b>${esc(o.label)}</b>${o.price ? ` - ${o.price} €/mois` : ''}<br>Disponible : ${esc(o.locations.join(', '))}<br><a href="${ORDER[o.provider]}">Commander</a></li>`).join('');
-      await sendMail(cfg, { to: sub.email, subject: `Serveur dispo : ${hits.map((h) => h.label.split(' - ')[0]).join(', ')}`, html: `<p>Du stock est disponible :</p><ul>${rows}</ul><p style="color:#888;font-size:12px"><a href="${cfg.publicUrl}/unsubscribe/${sub.id}">Se désinscrire</a></p>` });
+      const html = alertMail({ hits: hits.map((o) => ({ ...o, order: ORDER[o.provider], providerName: PNAME[o.provider] })), unsubUrl: `${cfg.publicUrl}/unsubscribe/${sub.id}`, siteUrl: cfg.publicUrl });
+      await sendMail(cfg, { to: sub.email, subject: `🚀 Serveur dispo : ${hits.map((h) => h.label.split(' - ')[0]).join(', ')}`, html });
       hits.forEach((h) => (sub.notified[h.key] = true));
       changed = true;
       await log(env, 'ok', `Alerte envoyée à ${sub.email} (${hits.length} offre(s))`);
@@ -130,7 +131,9 @@ async function subscribe(request, env, cfg) {
   let b; try { b = await request.json(); } catch { return json({ error: 'Requête invalide' }, 400); }
   const email = String(b.email || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 200) return json({ error: 'Email invalide' }, 400);
-  const known = new Set((await getOffers(env)).map((o) => o.key));
+  const offersList = await getOffers(env);
+  const known = new Set(offersList.map((o) => o.key));
+  const labelOf = Object.fromEntries(offersList.map((o) => [o.key, o.label.split(' - ')[0]]));
   const wanted = [...new Set(b.offers || [])].filter((k) => known.has(k)).slice(0, 150);
   if (!wanted.length) return json({ error: 'Choisis au moins une offre' }, 400);
   const subs = await getSubs(env);
@@ -142,7 +145,7 @@ async function subscribe(request, env, cfg) {
   }
   sub.offers = wanted; sub.notified = {};
   try {
-    await sendMail(cfg, { to: email, subject: 'Confirme ton alerte serveur', html: `<p><a href="${cfg.publicUrl}/confirm/${sub.id}">Confirmer mon email</a></p><p style="color:#888;font-size:12px">Si ce n'est pas toi, ignore ce message.</p>` });
+    await sendMail(cfg, { to: email, subject: '✅ Confirme ton alerte serveur', html: confirmMail({ url: `${cfg.publicUrl}/confirm/${sub.id}`, names: wanted.map((k) => labelOf[k] || k), siteUrl: cfg.publicUrl }) });
   } catch (e) { return json({ error: "Envoi du mail impossible (l'admin doit configurer Brevo)" }, 502); }
   await putSubs(env, subs);
   await log(env, 'info', `Inscription en attente : ${email}`);
@@ -196,7 +199,7 @@ async function admin(request, env, path) {
   if (path === '/status') return json({ status: (await env.KV.get('status', 'json')) || {}, subs: (await getSubs(env)).length });
   if (path === '/check' && request.method === 'POST') { await log(env, 'info', 'Scan manuel lancé'); return json(await runCheck(env, true)); }
   if (path === '/test-mail' && request.method === 'POST') {
-    try { await sendMail(await getCfg(env), { to: String(body.to || ''), subject: 'Test alertes serveurs', html: '<p>✅ Brevo fonctionne.</p>' }); await log(env, 'ok', 'Mail de test envoyé à ' + body.to); return json({ ok: true }); }
+    try { await sendMail(await getCfg(env), { to: String(body.to || ''), subject: 'Test alertes serveurs', html: testMail() }); await log(env, 'ok', 'Mail de test envoyé à ' + body.to); return json({ ok: true }); }
     catch (e) { await log(env, 'error', 'Test mail : ' + e.message); return json({ error: e.message }, 502); }
   }
   if (path === '/subs' && request.method === 'GET') return json((await getSubs(env)).map(({ id, email, confirmed, offers }) => ({ id, email, confirmed, offers: offers.length, keys: offers })));
