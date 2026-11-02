@@ -29,7 +29,7 @@ function layout({ preheader, title, hero, body, publicUrl, unsubUrl }) {
   const site = publicUrl || '';
   const logo = /^https:\/\//.test(site) ? `<img src="${esc(site)}/mail/radar.png" width="44" height="44" alt="&#9673;" style="display:block;border:0;outline:none;width:44px;height:44px;">` : `<span style="font-size:34px;line-height:44px;color:${C.cy};">&#9673;</span>`;
   const link = (href, label) => `<a href="${esc(href)}" style="color:${C.mut};text-decoration:underline;">${label}</a>`;
-  const links = [site && link(`${site}/conditions`, 'Conditions d&rsquo;utilisation'), site && link(site, 'Le site'), unsubUrl && link(unsubUrl, 'Se d&eacute;sinscrire')].filter(Boolean).join(`<span style="color:${C.dim};">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>`);
+  const links = [site && link(`${site}/conditions`, 'Conditions d&rsquo;utilisation'), site && link(site, 'Le site'), site && link(`${site}/manage`, 'G&eacute;rer mon alerte'), unsubUrl && link(unsubUrl, 'Se d&eacute;sinscrire')].filter(Boolean).join(`<span style="color:${C.dim};">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>`);
   return `<!doctype html><html lang="fr" xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"><title>${esc(title)}</title></head>
 <body style="margin:0;padding:0;background:${C.bg};-webkit-text-size-adjust:100%;">
 <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:${C.bg};font-size:1px;line-height:1px;">${esc(preheader)}&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;&#847;&zwnj;&nbsp;</div>
@@ -138,3 +138,22 @@ export function testMail({ publicUrl = '' } = {}) {
   return layout({ title: 'Test', preheader: 'L’envoi des mails est bien configuré.', hero, body: `<p style="margin:0;font-family:${FONT};font-size:14px;line-height:1.6;color:${C.mut};">Mail de test envoy&eacute; depuis la console admin.</p>`, publicUrl });
 }
 export const testText = () => `Brevo fonctionne. Ce mail de test confirme que l'envoi est bien configuré.\n\n--\nRadar serveurs, par ${AUTHOR}`;
+
+// ---- Lien magique pour modifier son alerte ----
+export function manageMail({ url, count = 0, publicUrl = '' }) {
+  const hero = `${pill('Gestion', C.cy)}${h1('Modifie ton alerte<br>en un clic')}${lead(`Tu as demand&eacute; &agrave; changer les serveurs que tu surveilles${count ? ` (${count} actuellement)` : ''}. Ce lien t&rsquo;ouvre directement ta page, sans mot de passe.`)}`;
+  const body = `${button(url, 'Modifier mon alerte &rarr;')}
+<div style="margin:10px 0 28px;font-family:${FONT};font-size:12px;color:${C.dim};">Le bouton ne marche pas ? Copie ce lien : <a href="${esc(url)}" style="color:${C.cy};word-break:break-all;">${esc(url)}</a></div>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:${C.card2};border:1px solid ${C.line};border-radius:12px;"><tr><td style="padding:14px 16px;font-family:${FONT};font-size:13px;line-height:1.6;color:${C.mut};">&#128274;&nbsp; <b style="color:${C.fg};">Lien personnel, valable 1 heure.</b> Ne le transmets &agrave; personne. Tu n&rsquo;as rien demand&eacute; ? Ignore ce message, rien ne change.</td></tr></table>`;
+  return layout({ title: 'Modifier mon alerte', preheader: 'Ton lien personnel pour changer tes serveurs surveillés.', hero, body, publicUrl });
+}
+export const manageText = ({ url, publicUrl = '' }) => `Modifie ton alerte en un clic
+
+Ouvre ce lien personnel (valable 1 heure, sans mot de passe) pour changer les serveurs que tu surveilles :
+${url}
+
+Tu n'as rien demandé ? Ignore ce message, rien ne change.
+
+--
+Radar serveurs, par ${AUTHOR}${publicUrl ? `\nConditions d'utilisation : ${publicUrl}/conditions` : ''}
+${TERMS}`;

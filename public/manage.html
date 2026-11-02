@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="referrer" content="no-referrer">
+<title>Gérer mon alerte · Radar serveurs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&display=swap">
+<link rel="stylesheet" href="/site.css?v=5">
+</head>
+<body>
+<main class="wrap">
+  <div class="top"><a class="link" href="/">← Retour au radar</a></div>
+
+  <!-- Étape 1 : demander le lien par mail -->
+  <section id="ask" class="msgpage" hidden>
+    <div class="msgcard">
+      <h1>Gérer mon alerte</h1>
+      <p>Entre l'adresse avec laquelle tu t'es inscrit. On t'envoie un lien personnel pour modifier tes serveurs. Pas de mot de passe.</p>
+      <form id="af" style="display:grid;gap:.7rem">
+        <input type="email" id="aemail" placeholder="ton@email.fr" required autocomplete="email" aria-label="Ton adresse mail" style="padding:.8rem .9rem;color:var(--fg);font:inherit;background:var(--bg,#05060f);border:1px solid var(--line);border-radius:10px">
+        <button class="cta" id="abtn">Recevoir mon lien</button>
+        <p id="amsg" role="status" style="margin:0"></p>
+      </form>
+    </div>
+  </section>
+
+  <!-- Étape 2 : modifier -->
+  <section id="edit" hidden>
+    <header class="hero" style="grid-template-columns:1fr">
+      <div>
+        <h1>Mon alerte</h1>
+        <p class="lede">Connecté en tant que <b id="who"></b>. Coche ou décoche les serveurs, puis enregistre.</p>
+      </div>
+    </header>
+    <div class="tools">
+      <input type="search" id="q" placeholder="Chercher (ex : VPS-2, CX22, 4 vCPU)" aria-label="Chercher une offre" autocomplete="off">
+    </div>
+    <div class="chips">
+      <button type="button" class="chip" id="only" aria-pressed="false">Cochées seulement</button>
+      <span class="spacer"></span>
+      <button type="button" class="link" id="all">Tout cocher</button>
+      <button type="button" class="link" id="none">Tout décocher</button>
+    </div>
+    <div class="list" id="list" aria-live="polite"><div class="empty">Chargement…</div></div>
+    <p style="text-align:center;margin:1.6rem 0 6rem"><button type="button" class="link" id="del">Supprimer mon alerte et mon adresse</button></p>
+  </section>
+
+  <section id="done" class="msgpage" hidden>
+    <div class="msgcard"><div class="ic" id="dic">✓</div><h1 id="dt"></h1><p id="dp"></p><a class="cta" href="/">Retour au radar</a></div>
+  </section>
+
+  <footer class="foot"><p class="credit">Fait avec <span class="hrt">&hearts;</span> par <a href="https://github.com/Wallacecleaver" target="_blank" rel="noopener">Wallace</a> &middot; <a href="/conditions">Conditions d'utilisation</a></p></footer>
+</main>
+
+<div class="dock" id="dock">
+  <form id="sf">
+    <span class="cnt" id="cnt"></span>
+    <span style="flex:1"></span>
+    <button class="cta" id="sbtn">Enregistrer</button>
+    <p id="msg" role="status" style="flex-basis:100%;margin:0"></p>
+  </form>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const mk=(t,p={},...k)=>{const e=Object.assign(document.createElement(t),p);k.forEach(x=>e.append(x));return e};
+const show=id=>['ask','edit','done'].forEach(s=>$(s).hidden=s!==id);
+const split=l=>{const i=l.indexOf(' - ');return i<0?[l,'']:[l.slice(0,i),l.slice(i+3)]};
+const eur=p=>p.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const token=(location.hash.match(/t=([0-9a-f-]{72})/)||[])[1];
+const H={authorization:'Bearer '+token,'content-type':'application/json'};
+let all=[],provs=[],sel=new Set(),q='',only=false;
+const pname=id=>provs.find(p=>p.id===id)?.name||id;
+
+function finish(ok,title,text){show('done');$('dock').classList.remove('on');$('dic').textContent=ok?'✓':'!';$('dic').className='ic'+(ok?'':' ko');$('dt').textContent=title;$('dp').textContent=text}
+
+function draw(){
+  const t=q.trim().toLowerCase(),l=$('list');
+  const r=all.filter(o=>(!only||sel.has(o.key))&&(!t||(o.label+' '+pname(o.provider)).toLowerCase().includes(t)))
+    .sort((a,b)=>(sel.has(b.key)-sel.has(a.key))||(b.locations.length>0)-(a.locations.length>0)||(a.price??1e9)-(b.price??1e9));
+  l.replaceChildren();
+  if(!r.length)l.append(mk('div',{className:'empty'},'Aucune offre ne correspond.'));
+  for(const o of r){
+    const ok=o.locations.length>0,[name,specs]=split(o.label);
+    const cb=mk('input',{type:'checkbox',checked:sel.has(o.key),ariaLabel:'Suivre '+o.label});
+    cb.onchange=()=>{cb.checked?sel.add(o.key):sel.delete(o.key);row.classList.toggle('sel',cb.checked);count()};
+    const row=mk('label',{className:'row'+(cb.checked?' sel':'')},cb,
+      mk('span',{className:'main'},mk('span',{className:'name'},name,mk('em',{textContent:pname(o.provider)})),specs?mk('span',{className:'specs',textContent:specs}):''),
+      mk('span',{className:'state '+(ok?'ok':'ko')},ok?'Dispo':'Indispo',ok?mk('i',{textContent:o.locations.join(', ')}):''),
+      mk('span',{className:'price'},o.price!=null?eur(o.price):'',o.price!=null?mk('small',{textContent:' €/mois'}):''),mk('span'));
+    l.append(row);
+  }
+  count();
+}
+function count(){const n=sel.size;$('dock').classList.add('on');$('cnt').textContent=n+(n>1?' offres suivies':' offre suivie')}
+
+async function init(){
+  if(!token){show('ask');return}
+  try{
+    const [me,off]=await Promise.all([fetch('/api/manage/me',{headers:H}),fetch('/api/offers')]);
+    if(!me.ok){history.replaceState(null,'',location.pathname);show('ask');$('amsg').className='err';$('amsg').textContent='Ce lien a expiré. Redemande-en un ci-dessous.';return}
+    const m=await me.json(),d=await off.json();
+    all=d.offers||[];provs=d.providers||[];sel=new Set(m.offers);$('who').textContent=m.email;
+    show('edit');draw();
+  }catch{show('ask');$('amsg').className='err';$('amsg').textContent='Impossible de charger ton alerte, réessaie.'}
+}
+
+$('af').onsubmit=async e=>{
+  e.preventDefault();const m=$('amsg');m.className='';m.textContent='';$('abtn').disabled=true;
+  try{
+    const r=await fetch('/api/manage/request',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('aemail').value})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw Error(d.error||'Une erreur est survenue, réessaie.');
+    m.className='good';m.textContent="C'est envoyé. Si cette adresse a une alerte active, tu vas recevoir un lien dans quelques instants (regarde aussi dans les spams).";
+  }catch(x){m.className='err';m.textContent=x.message}
+  $('abtn').disabled=false;
+};
+$('sf').onsubmit=async e=>{
+  e.preventDefault();const m=$('msg');m.className='';m.textContent='';
+  if(!sel.size){m.className='err';m.textContent='Coche au moins une offre, ou supprime ton alerte.';return}
+  $('sbtn').disabled=true;
+  try{
+    const r=await fetch('/api/manage/save',{method:'POST',headers:H,body:JSON.stringify({offers:[...sel]})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw Error(d.error||'Une erreur est survenue, réessaie.');
+    m.className='good';m.textContent='Enregistré : '+d.count+(d.count>1?' offres suivies.':' offre suivie.');
+  }catch(x){m.className='err';m.textContent=x.message}
+  $('sbtn').disabled=false;
+};
+$('del').onclick=async()=>{
+  if(!confirm('Supprimer définitivement ton alerte et ton adresse ?'))return;
+  const r=await fetch('/api/manage/delete',{method:'POST',headers:H,body:'{}'});
+  r.ok?finish(true,'Alerte supprimée','Ton adresse a été effacée, tu ne recevras plus aucun mail. Tu peux te réinscrire à tout moment.'):finish(false,'Erreur','Impossible de supprimer, redemande un lien.');
+};
+$('q').oninput=e=>{q=e.target.value;draw()};
+$('only').onclick=()=>{only=!only;$('only').setAttribute('aria-pressed',only);draw()};
+$('all').onclick=()=>{all.filter(o=>!q.trim()||(o.label+' '+pname(o.provider)).toLowerCase().includes(q.trim().toLowerCase())).forEach(o=>sel.add(o.key));draw()};
+$('none').onclick=()=>{sel.clear();draw()};
+init();
+</script>
+</body>
+</html>

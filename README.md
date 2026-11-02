@@ -40,6 +40,10 @@ Le site est ensuite disponible sur l'URL `*.workers.dev` affichée par wrangler.
 - Un mail est envoyé quand une offre surveillée passe en dispo. Quand elle repasse indispo, l'alerte se réarme.
 - Inscription avec confirmation par mail, lien de désinscription dans chaque alerte.
 
+## Modifier son alerte (côté inscrit)
+
+Page `/manage` : l'inscrit entre son mail, reçoit un lien personnel (valable 1 h, sans mot de passe), et peut changer ses serveurs ou supprimer son alerte. Le lien est dans un `#` (jamais envoyé aux serveurs ni dans les logs). La réponse est identique que l'adresse existe ou non, avec limites de requêtes par IP et par adresse. Se réinscrire avec une adresse déjà active n'écrase plus rien : ça renvoie ce lien.
+
 ## Console admin
 
 Va sur `/admin` juste après le déploiement : au premier accès, tu choisis ton mot de passe admin (fais-le tout de suite). Ensuite tout se règle depuis la console : clé Brevo, adresse expéditeur, token Hetzner, webhook Discord, pause des alertes, liste des inscrits, scan manuel et mail de test. Les valeurs sont stockées dans le KV, plus besoin de `wrangler secret`.

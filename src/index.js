@@ -1,7 +1,7 @@
 import { fetchOvh } from './ovh.js';
 import { fetchHetzner } from './hetzner.js';
 import { fetchScaleway } from './scaleway.js';
-import { sendMail, esc, confirmMail, confirmText, alertMail, alertText, testMail, testText } from './mail.js';
+import { sendMail, esc, confirmMail, confirmText, alertMail, alertText, testMail, testText, manageMail, manageText } from './mail.js';
 
 // Fournisseurs surveilles. `needs` = champ de config requis (sinon le fournisseur est ignore).
 const PROVIDERS = [
@@ -139,6 +139,11 @@ async function subscribe(request, env, cfg) {
   if (!wanted.length) return json({ error: 'Choisis au moins une offre' }, 400);
   const subs = await getSubs(env);
   let sub = subs.find((s) => s.email === email);
+  // Deja inscrit et confirme : on n'ecrase rien, on envoie un lien pour modifier (evite qu'un tiers change l'alerte d'autrui)
+  if (sub?.confirmed) {
+    try { await sendManage(env, cfg, sub); } catch (e) { return json({ error: "Envoi du mail impossible (l'admin doit configurer Brevo)" }, 502); }
+    return json({ ok: true, existing: true });
+  }
   if (!sub) {
     if (subs.length >= 300) return json({ error: 'Complet pour le moment' }, 503);
     sub = { id: crypto.randomUUID(), email, confirmed: false, offers: [], notified: {} };
@@ -151,6 +156,61 @@ async function subscribe(request, env, cfg) {
   await putSubs(env, subs);
   await log(env, 'info', `Inscription en attente : ${email}`);
   return json({ ok: true });
+}
+
+// ---------- gestion de son alerte (lien magique par mail, sans mot de passe) ----------
+async function sendManage(env, cfg, sub) {
+  if (await limited(env, 'rl:mge:' + sub.email, 3, 3600)) return;
+  const token = crypto.randomUUID() + crypto.randomUUID();
+  await env.KV.put('mg:' + token, sub.id, { expirationTtl: 3600 });
+  const url = `${cfg.publicUrl}/manage#t=${token}`;
+  await sendMail(cfg, { to: sub.email, subject: '🔧 Modifier mon alerte serveur', html: manageMail({ url, count: sub.offers.length, publicUrl: cfg.publicUrl }), text: manageText({ url, publicUrl: cfg.publicUrl }) });
+  await log(env, 'info', `Lien de gestion envoyé à ${sub.email}`);
+}
+async function manageSub(request, env) {
+  const t = (request.headers.get('authorization') || '').replace(/^Bearer /, '');
+  if (!/^[0-9a-f-]{72}$/.test(t)) return null;
+  const id = await env.KV.get('mg:' + t);
+  if (!id) return null;
+  const subs = await getSubs(env), sub = subs.find((s) => s.id === id && s.confirmed);
+  return sub ? { subs, sub } : null;
+}
+async function manage(request, env, cfg, path, ctx) {
+  if (path === '/request' && request.method === 'POST') {
+    const ip = request.headers.get('cf-connecting-ip') || 'x';
+    if (await limited(env, 'rl:mg:' + ip, 10, 3600)) return json({ error: 'Trop de tentatives, réessaie plus tard' }, 429);
+    const b = await request.json().catch(() => ({}));
+    const email = String(b.email || '').trim().toLowerCase();
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 200) {
+      // Reponse identique que l'adresse existe ou non (pas de fuite sur qui est inscrit)
+      ctx.waitUntil((async () => {
+        const sub = (await getSubs(env)).find((s) => s.email === email && s.confirmed);
+        if (sub) await sendManage(env, cfg, sub).catch((e) => log(env, 'error', `Lien de gestion à ${email} : ${e.message}`));
+      })());
+    }
+    return json({ ok: true });
+  }
+  const s = await manageSub(request, env);
+  if (!s) return json({ error: 'Lien expiré ou invalide : redemande-en un.' }, 401);
+  if (path === '/me' && request.method === 'GET') return json({ email: s.sub.email, offers: s.sub.offers });
+  if (path === '/save' && request.method === 'POST') {
+    const b = await request.json().catch(() => ({}));
+    const known = new Set((await getOffers(env)).map((o) => o.key));
+    const wanted = [...new Set(b.offers || [])].filter((k) => known.has(k)).slice(0, 150);
+    if (!wanted.length) return json({ error: 'Choisis au moins une offre (ou supprime ton alerte)' }, 400);
+    // On garde l'historique des offres conservees : pas de nouvelle alerte inutile pour celles deja signalees
+    s.sub.notified = Object.fromEntries(Object.entries(s.sub.notified || {}).filter(([k]) => wanted.includes(k)));
+    s.sub.offers = wanted;
+    await putSubs(env, s.subs);
+    await log(env, 'info', `Alerte modifiée par ${s.sub.email} (${wanted.length} offre(s))`);
+    return json({ ok: true, count: wanted.length });
+  }
+  if (path === '/delete' && request.method === 'POST') {
+    await putSubs(env, s.subs.filter((x) => x.id !== s.sub.id));
+    await log(env, 'info', `Alerte supprimée par ${s.sub.email}`);
+    return json({ ok: true });
+  }
+  return json({ error: 'Not found' }, 404);
 }
 
 // ---------- admin ----------
@@ -273,11 +333,12 @@ async function admin(request, env, path) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const url = new URL(request.url), p = url.pathname;
     if (p.startsWith('/api/admin/')) return admin(request, env, p.slice(10));
     const cfg = await getCfg(env);
     if (!cfg.publicUrl) { const c = await rawCfg(env); c.publicUrl = url.origin; await env.KV.put('config', JSON.stringify(c)); cfg.publicUrl = url.origin; }
+    if (p.startsWith('/api/manage/')) return manage(request, env, cfg, p.slice(11), ctx);
     if (p === '/api/offers') {
       let offers = (await getOffers(env)).filter((o) => ORDER[o.provider]);
       if (!offers.length) await runCheck(env), (offers = (await getOffers(env)).filter((o) => ORDER[o.provider]));
