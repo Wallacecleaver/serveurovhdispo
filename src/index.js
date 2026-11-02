@@ -383,6 +383,42 @@ async function admin(request, env, path) {
     await log(env, 'info', 'Réglages modifiés : ' + Object.keys(body).join(', '));
     return json({ ok: true });
   }
+  if (path === '/health') {
+    const cfg = await getCfg(env), t0 = () => Date.now();
+    const run = async (fn) => { const a = t0(); try { const r = await fn(); return { ...r, ms: t0() - a }; } catch (e) { return { state: 'ko', detail: e.message || 'Erreur', ms: t0() - a }; } };
+    const [brevo, d1, kv] = await Promise.all([
+      run(async () => {
+        if (!cfg.brevoKey) return { state: 'ko', detail: 'Aucune clé API Brevo enregistrée' };
+        const r = await fetch('https://api.brevo.com/v3/account', { headers: { 'api-key': cfg.brevoKey, accept: 'application/json' } });
+        if (r.status === 401) return { state: 'ko', detail: 'Clé refusée par Brevo (invalide)' };
+        if (r.status === 403) return { state: 'warn', detail: 'Clé acceptée mais permissions limitées (compte non lisible)' };
+        if (!r.ok) return { state: 'ko', detail: `Brevo a répondu ${r.status}` };
+        const a = await r.json().catch(() => ({}));
+        const credits = (a.plan || []).find((x) => /^(free|payAsYouGo|subscription)$/i.test(x.type || '') && typeof x.credits === 'number');
+        const from = String(cfg.mailFrom || '').toLowerCase();
+        if (!from) return { state: 'warn', detail: 'Clé valide, mais aucune adresse expéditeur renseignée' };
+        const sr = await fetch('https://api.brevo.com/v3/senders', { headers: { 'api-key': cfg.brevoKey, accept: 'application/json' } });
+        if (sr.ok) {
+          const sd = ((await sr.json().catch(() => ({}))).senders || []).find((x) => String(x.email).toLowerCase() === from);
+          if (!sd) return { state: 'ko', detail: `Clé valide, mais ${from} n'est pas un expéditeur Brevo` };
+          if (sd.active === false) return { state: 'warn', detail: `Clé valide, mais l'expéditeur ${from} n'est pas encore validé` };
+        }
+        return { state: 'ok', detail: 'API joignable · clé valide · expéditeur ' + from + (credits ? ` · ${credits.credits} crédits` : '') };
+      }),
+      run(async () => {
+        if (!env.DB) return { state: 'ko', detail: 'Binding D1 « DB » absent (wrangler.toml)' };
+        const d = await db(env);
+        const n = (await d.prepare('SELECT COUNT(*) AS n FROM subs').first())?.n ?? 0;
+        return { state: 'ok', detail: `Base D1 reliée · tables prêtes · ${n} inscrit(s)` };
+      }),
+      run(async () => {
+        if (!env.KV) return { state: 'ko', detail: 'Binding KV « KV » absent (wrangler.toml)' };
+        const ad = await env.KV.get('admin', 'json');
+        return { state: 'ok', detail: 'KV relié · lecture OK' + (ad ? ' · accès admin présent' : '') };
+      }),
+    ]);
+    return json({ services: [{ id: 'brevo', name: 'API Brevo', ...brevo }, { id: 'd1', name: 'Base D1', ...d1 }, { id: 'kv', name: 'KV', ...kv }], t: Date.now() });
+  }
   if (path === '/status') return json({ status: await getStatus(env), subs: await countSubs(env) });
   if (path === '/check' && request.method === 'POST') { await log(env, 'info', 'Scan manuel lancé'); return json(await runCheck(env, true)); }
   if (path === '/test-mail' && request.method === 'POST') {
