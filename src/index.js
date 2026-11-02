@@ -1,13 +1,11 @@
 import { fetchOvh } from './ovh.js';
 import { fetchHetzner } from './hetzner.js';
-import { fetchKimsufi } from './kimsufi.js';
 import { fetchScaleway } from './scaleway.js';
 import { sendMail, esc } from './mail.js';
 
 // Fournisseurs surveilles. `needs` = champ de config requis (sinon le fournisseur est ignore).
 const PROVIDERS = [
   { id: 'ovh', name: 'OVH VPS', order: 'https://www.ovhcloud.com/fr/vps/', run: () => fetchOvh() },
-  { id: 'kimsufi', name: 'Kimsufi / OVH dédiés', order: 'https://eco.ovhcloud.com/fr/', run: () => fetchKimsufi() },
   { id: 'hetzner', name: 'Hetzner Cloud', order: 'https://console.hetzner.cloud/', needs: 'hcloud', run: (c) => fetchHetzner(c.hcloud) },
   { id: 'scaleway', name: 'Scaleway', order: 'https://console.scaleway.com/instance/servers/create', needs: 'scaleway', run: (c) => fetchScaleway(c.scaleway) },
 ];
@@ -241,11 +239,6 @@ async function admin(request, env, path) {
         if (!r.ok) return fail(`Scaleway a répondu ${r.status}`);
         return good(`Clé valide · ${Object.keys((await r.json()).servers || {}).length} types de serveurs lisibles`);
       }
-      if (s === 'kimsufi') {
-        const r = await fetch('https://eu.api.ovh.com/v1/dedicated/server/datacenter/availabilities?planCode=24ska01');
-        if (!r.ok) return fail(`API OVH dédiés a répondu ${r.status}`);
-        return good('API OVH dédiés (Kimsufi) joignable');
-      }
       if (s === 'discord') {
         const u = v || cfg.discord;
         if (!u) return good('Non configuré (optionnel)', false, true);
@@ -282,9 +275,9 @@ export default {
     const cfg = await getCfg(env);
     if (!cfg.publicUrl) { const c = await rawCfg(env); c.publicUrl = url.origin; await env.KV.put('config', JSON.stringify(c)); cfg.publicUrl = url.origin; }
     if (p === '/api/offers') {
-      let offers = await getOffers(env);
-      if (!offers.length) await runCheck(env), (offers = await getOffers(env));
-      return json({ providers: PROVIDERS.filter((p) => offers.some((o) => o.provider === p.id)).map(({ id, name }) => ({ id, name })), offers, lastRun: ((await env.KV.get('status', 'json')) || {}).lastRun || null });
+      let offers = (await getOffers(env)).filter((o) => ORDER[o.provider]);
+      if (!offers.length) await runCheck(env), (offers = (await getOffers(env)).filter((o) => ORDER[o.provider]));
+      return json({ providers: PROVIDERS.filter((p) => offers.some((o) => o.provider === p.id)).map(({ id, name, order }) => ({ id, name, order })), offers, lastRun: ((await env.KV.get('status', 'json')) || {}).lastRun || null });
     }
     if (p === '/api/subscribe' && request.method === 'POST') return subscribe(request, env, cfg);
     const m = p.match(/^\/(confirm|unsubscribe)\/([0-9a-f-]{36})$/);

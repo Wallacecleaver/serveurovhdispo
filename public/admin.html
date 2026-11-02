@@ -22,7 +22,7 @@ $('app').replaceChildren(mk('div',{className:'app'},side,mk('div',{id:'view'})))
 function show(v){VIEWS.forEach(([id])=>$('n-'+id).classList.toggle('on',id===v));$('view').replaceChildren(mk('h1',{textContent:VIEWS.find(x=>x[0]===v)[2]}));({dash,cfg,subs,logs,sec})[v]()}
 
 async function dash(){const {status:s,subs}=await api('/status');const c=await api('/config');
-const PN={ovh:'OVH VPS',kimsufi:'Kimsufi',hetzner:'Hetzner',scaleway:'Scaleway'};const ids=Object.keys(PN).filter(k=>s[k]&&!s[k].skipped);const tot=ids.reduce((a,k)=>a+(s[k].count||0),0),av=ids.reduce((a,k)=>a+(s[k].available||0),0);
+const PN={ovh:'OVH VPS',hetzner:'Hetzner',scaleway:'Scaleway'};const ids=Object.keys(PN).filter(k=>s[k]&&!s[k].skipped);const tot=ids.reduce((a,k)=>a+(s[k].count||0),0),av=ids.reduce((a,k)=>a+(s[k].available||0),0);
 const st=(l,v,t)=>mk('div',{className:'card stat'},mk('b',{textContent:v}),mk('span',{textContent:l}));
 const tag=(n,x)=>x?mk('span',{className:'tag '+(x.ok?'ok':'ko'),style:'margin-right:1rem',textContent:x.ok?`${n} · ${x.count} offres · ${x.available} dispo`:`${n} · ${x.error}`}):'';
 const v=$('view');
@@ -32,7 +32,7 @@ mk('div',{className:'bar',style:'margin-top:1rem'},mk('button',{id:'chk',textCon
 mk('button',{className:'ghost',textContent:c.paused?'▶ Reprendre les alertes':'⏸ Mettre en pause',onclick:async()=>{await api('/config',{paused:!c.paused});show('dash')}})),mk('div',{id:'n1',className:'note'})));addChk()}
 
 async function chk(s,id,value,mailFrom){note(id,'Vérification…',1);try{const r=await api('/verify',{service:s,value,mailFrom});note(id,(r.warn?'⚠ ':'✔ ')+r.detail,1)}catch(e){note(id,'✘ '+e.message)}}
-function addChk(){const out=mk('div',{id:'vl',style:'margin-top:1rem'});$('view').append(section('Vérification des clés','Teste en direct Brevo, Hetzner, Scaleway, Discord, OVH et Kimsufi avec ce qui est enregistré.',mk('button',{textContent:'Tout vérifier',onclick:async e=>{e.target.disabled=true;out.replaceChildren();for(const [s,n] of [['brevo','Brevo'],['hetzner','Hetzner'],['scaleway','Scaleway'],['discord','Discord'],['ovh','OVH'],['kimsufi','Kimsufi']]){let t,c;try{const r=await api('/verify',{service:s});t=(r.skip?'— ':r.warn?'⚠ ':'✔ ')+n+' : '+r.detail;c=r.skip?'meta':r.warn?'meta':'good'}catch(x){t='✘ '+n+' : '+x.message;c='err'}out.append(mk('div',{className:c,textContent:t,style:'padding:.25rem 0'}))}e.target.disabled=false}}),out))}
+function addChk(){const out=mk('div',{id:'vl',style:'margin-top:1rem'});$('view').append(section('Vérification des clés','Teste en direct Brevo, Hetzner, Scaleway, Discord et OVH avec ce qui est enregistré.',mk('button',{textContent:'Tout vérifier',onclick:async e=>{e.target.disabled=true;out.replaceChildren();for(const [s,n] of [['brevo','Brevo'],['hetzner','Hetzner'],['scaleway','Scaleway'],['discord','Discord'],['ovh','OVH']]){let t,c;try{const r=await api('/verify',{service:s});t=(r.skip?'— ':r.warn?'⚠ ':'✔ ')+n+' : '+r.detail;c=r.skip?'meta':r.warn?'meta':'good'}catch(x){t='✘ '+n+' : '+x.message;c='err'}out.append(mk('div',{className:c,textContent:t,style:'padding:.25rem 0'}))}e.target.disabled=false}}),out))}
 
 async function cfg(){const c=await api('/config');const v=$('view');
 const ph=x=>x||'non configuré';

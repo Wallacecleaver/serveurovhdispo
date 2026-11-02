@@ -1,27 +1,169 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Radar serveurs</title><link rel="stylesheet" href="/style.css"></head>
-<body><main class="wrap">
-<h1>RADAR SERVEURS</h1>
-<p class="sub">Choisis les serveurs qui t'intéressent (OVH, Kimsufi, Hetzner, Scaleway…) et reçois un mail dès qu'ils reviennent en stock. <span id="last" class="meta"></span></p>
-<div id="stats" class="meta" style="margin-bottom:1rem"></div><form id="f">
-<div class="bar" id="bar"><button type="button" class="chip on" data-p="">Tous</button><span id="provs" style="display:contents"></span><button type="button" class="chip" id="onlyok">Dispo seulement</button></div>
-<div class="grid" id="list"><div class="meta">Scan en cours…</div></div>
-<h2>Ton email</h2>
-<div class="card"><input type="email" id="email" placeholder="toi@exemple.com" required autocomplete="email"><button id="btn" style="margin-top:.8rem">Activer l'alerte</button><div id="msg" role="status"></div></div>
-</form></main>
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Radar serveurs : alerte dès qu'un serveur est en stock</title>
+<meta name="description" content="Choisis les serveurs OVH, Hetzner ou Scaleway que tu veux et reçois un mail dès qu'ils sont de nouveau en stock.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&display=swap">
+<link rel="stylesheet" href="/site.css">
+</head>
+<body>
+<main class="wrap">
+  <header class="hero">
+    <div>
+      <h1>Radar serveurs</h1>
+      <p class="lede">Coche les serveurs qui t'intéressent. Dès que l'un d'eux revient en stock en Europe, tu reçois un mail.</p>
+      <p class="scan" id="scan">Scan en cours…</p>
+    </div>
+    <div class="radar" role="img" aria-label="Nombre de serveurs disponibles maintenant">
+      <div class="n"><b id="nb">–</b><span id="nbl">dispo</span></div>
+    </div>
+  </header>
+
+  <section aria-label="Offres">
+    <div class="tools">
+      <input type="search" id="q" placeholder="Chercher (ex : VPS-2, CX22, 4 vCPU)" aria-label="Chercher une offre" autocomplete="off">
+      <select id="sort" aria-label="Trier">
+        <option value="dispo">Dispo d'abord</option>
+        <option value="prix">Prix croissant</option>
+        <option value="nom">Nom</option>
+      </select>
+    </div>
+    <div class="chips" id="chips">
+      <button type="button" class="chip" data-p="" aria-pressed="true">Tous</button>
+      <span id="provs" style="display:contents"></span>
+      <button type="button" class="chip" id="only" aria-pressed="false">Dispo seulement</button>
+      <span class="spacer"></span>
+      <button type="button" class="link" id="all">Tout cocher</button>
+      <button type="button" class="link" id="none">Tout décocher</button>
+    </div>
+    <div class="list" id="list" aria-live="polite"><div class="empty">Chargement des offres…</div></div>
+  </section>
+
+  <section class="faq">
+    <h2>Questions fréquentes</h2>
+    <details><summary>Comment ça marche ?</summary><p>Les stocks sont relus toutes les 5 minutes. Quand une offre que tu as cochée passe de indispo à dispo, tu reçois un mail. Si elle repasse indispo puis revient, tu es prévenu à nouveau.</p></details>
+    <details><summary>Je coche une offre déjà dispo, que se passe-t-il ?</summary><p>Tu reçois un mail tout de suite pour te dire qu'elle est disponible, puis de nouveau si elle repasse indispo et revient.</p></details>
+    <details><summary>Comment me désinscrire ?</summary><p>Chaque mail contient un lien de désinscription. Un clic suffit, ton adresse est supprimée.</p></details>
+    <details><summary>Que faites-vous de mon adresse mail ?</summary><p>Elle sert uniquement à t'envoyer ces alertes. Tu dois d'abord confirmer ton adresse avec un lien reçu par mail.</p></details>
+  </section>
+  <footer>Les stocks sont indicatifs : un serveur affiché dispo peut être pris avant ta commande.</footer>
+</main>
+
+<div class="dock" id="dock">
+  <form id="f">
+    <span class="cnt" id="cnt"></span>
+    <input type="email" id="email" placeholder="ton@email.fr" required autocomplete="email" aria-label="Ton adresse mail">
+    <button class="cta" id="btn">Activer l'alerte</button>
+    <p class="hint" id="hint"></p>
+    <p id="msg" role="status"></p>
+  </form>
+</div>
+
 <script>
-const $=id=>document.getElementById(id);let all=[],prov='',only=false,names={};
+const $=id=>document.getElementById(id);
 const mk=(t,p={},...k)=>{const e=Object.assign(document.createElement(t),p);k.forEach(x=>e.append(x));return e};
-function draw(){const sel=new Set([...document.querySelectorAll('input[name=o]:checked')].map(i=>i.value));const l=$('list');l.replaceChildren();
-const rows=all.filter(o=>(!prov||o.provider===prov)&&(!only||o.locations.length)).sort((a,b)=>(b.locations.length>0)-(a.locations.length>0)||(a.price??1e9)-(b.price??1e9));
-if(!rows.length){l.append(mk('div',{className:'meta',textContent:'Aucune offre à afficher.'}));return}
-for(const o of rows){const ok=o.locations.length>0;const i=mk('input',{type:'checkbox',name:'o',value:o.key,checked:sel.has(o.key)});
-l.append(mk('label',{className:'card offer'},i,mk('b',{textContent:o.label}),mk('span',{className:'meta',textContent:(names[o.provider]||o.provider)+(o.price?' · '+o.price+' €/mois':'')}),mk('br'),mk('span',{className:'tag '+(ok?'ok':'ko'),textContent:ok?'Dispo · '+o.locations.join(', '):'Indispo'})))}}
-const pick=b=>{prov=b.dataset.p;document.querySelectorAll('[data-p]').forEach(x=>x.classList.toggle('on',x===b));draw()};
-document.querySelector('[data-p=""]').onclick=e=>pick(e.target);
-$('onlyok').onclick=e=>{only=!only;e.target.classList.toggle('on',only);draw()};
-fetch('/api/offers').then(r=>r.json()).then(d=>{all=d.offers;(d.providers||[]).forEach(p=>{names[p.id]=p.name;$('provs').append(mk('button',{type:'button',className:'chip',textContent:p.name,onclick:e=>pick(e.target)},));$('provs').lastChild.dataset.p=p.id});if(d.lastRun)$('last').textContent='Dernier scan : '+new Date(d.lastRun).toLocaleTimeString('fr-FR');$('stats').textContent=all.length+' offres suivies · '+all.filter(o=>o.locations.length).length+' dispo maintenant';draw()}).catch(()=>$('list').textContent='Chargement impossible.');
-$('f').onsubmit=async e=>{e.preventDefault();const m=$('msg');m.className='';m.textContent='';
-const offers=[...document.querySelectorAll('input[name=o]:checked')].map(i=>i.value);
-if(!offers.length){m.className='err';m.textContent='Coche au moins une offre.';return}
-$('btn').disabled=true;try{const r=await fetch('/api/subscribe',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('email').value,offers})});const d=await r.json();if(!r.ok)throw Error(d.error||'Erreur');m.className='good';m.textContent='Presque fini : clique sur le lien dans le mail de confirmation (vérifie les spams).'}catch(x){m.className='err';m.textContent=x.message}$('btn').disabled=false};
-</script></body></html>
+const store={get(k,d){try{const v=localStorage.getItem(k);return v?JSON.parse(v):d}catch{return d}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch{}}};
+let all=[],provs=[],prov='',only=false,q='',sort='dispo',lastRun=null,loaded=false;
+const sel=new Set(store.get('sel',[]));
+const pname=id=>provs.find(p=>p.id===id)?.name||id;
+const split=l=>{const i=l.indexOf(' - ');return i<0?[l,'']:[l.slice(0,i),l.slice(i+3)]};
+const ago=t=>{const m=Math.round((Date.now()-t)/6e4);return m<1?"à l'instant":m<60?`il y a ${m} min`:`il y a ${Math.round(m/60)} h`};
+const eur=p=>p==null?'':p.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2});
+
+function rows(){
+  const t=q.trim().toLowerCase();
+  const r=all.filter(o=>(!prov||o.provider===prov)&&(!only||o.locations.length)&&(!t||(o.label+' '+pname(o.provider)).toLowerCase().includes(t)));
+  const price=o=>o.price??1e9;
+  r.sort(sort==='prix'?(a,b)=>price(a)-price(b)
+    :sort==='nom'?(a,b)=>a.label.localeCompare(b.label,'fr',{numeric:true})
+    :(a,b)=>(b.locations.length>0)-(a.locations.length>0)||price(a)-price(b));
+  return r;
+}
+
+function draw(){
+  const l=$('list'),r=rows();
+  l.replaceChildren();
+  if(!r.length){
+    const b=mk('button',{type:'button',className:'link',textContent:'Réinitialiser les filtres',onclick:()=>{prov='';only=false;q='';$('q').value='';syncChips();draw()}});
+    l.append(mk('div',{className:'empty'},loaded?'Aucune offre ne correspond.':'Chargement des offres…',loaded?b:''));
+  }
+  for(const o of r){
+    const ok=o.locations.length>0,[name,specs]=split(o.label);
+    const cb=mk('input',{type:'checkbox',checked:sel.has(o.key),ariaLabel:'Suivre '+o.label});
+    cb.onchange=()=>{cb.checked?sel.add(o.key):sel.delete(o.key);row.classList.toggle('sel',cb.checked);dock()};
+    const row=mk('label',{className:'row'+(cb.checked?' sel':'')},
+      cb,
+      mk('span',{className:'main'},mk('span',{className:'name'},name,mk('em',{textContent:pname(o.provider)})),specs?mk('span',{className:'specs',textContent:specs}):''),
+      mk('span',{className:'state '+(ok?'ok':'ko')},ok?'Dispo':'Indispo',ok?mk('i',{textContent:o.locations.join(', ')}):''),
+      mk('span',{className:'price'},o.price!=null?eur(o.price):'',o.price!=null?mk('small',{textContent:' €/mois'}):''),
+      ok?mk('a',{className:'go',href:provs.find(p=>p.id===o.provider)?.order||'#',target:'_blank',rel:'noopener noreferrer',textContent:'Commander'}):mk('span'));
+    l.append(row);
+  }
+  const n=all.filter(o=>o.locations.length).length;
+  $('nb').textContent=loaded?n:'–';$('nb').className=n?'some':'';
+  $('nbl').textContent=n>1?'serveurs dispo':'serveur dispo';
+  document.querySelectorAll('[data-p]').forEach(b=>{const c=b.querySelector('small');if(c)c.textContent=all.filter(o=>o.provider===b.dataset.p).length});
+  dock();
+}
+
+function dock(){
+  const n=sel.size,byKey=Object.fromEntries(all.map(o=>[o.key,o]));
+  $('dock').classList.toggle('on',n>0);
+  $('cnt').textContent=n+(n>1?' offres choisies':' offre choisie');
+  $('hint').textContent=[...sel].some(k=>byKey[k]?.locations.length)?"Une offre que tu as cochée est déjà dispo : tu recevras un mail tout de suite.":'';
+  store.set('sel',[...sel]);
+}
+
+function syncChips(){
+  document.querySelectorAll('[data-p]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.p===prov));
+  $('only').setAttribute('aria-pressed',only);
+}
+
+function tick(){$('scan').textContent=lastRun?'Dernier scan '+ago(lastRun)+', mis à jour toutes les 5 minutes.':'Premier scan en cours…'}
+
+async function load(){
+  try{
+    const d=await (await fetch('/api/offers')).json();
+    all=d.offers||[];provs=d.providers||[];lastRun=d.lastRun;loaded=true;
+    const keys=new Set(all.map(o=>o.key));[...sel].forEach(k=>keys.has(k)||sel.delete(k));
+    const box=$('provs');box.replaceChildren();
+    for(const p of provs)box.append(mk('button',{type:'button',className:'chip',textContent:p.name,onclick:()=>{prov=p.id;syncChips();draw()}},mk('small',{textContent:''})));
+    box.querySelectorAll('.chip').forEach((b,i)=>{b.dataset.p=provs[i].id});
+    syncChips();draw();tick();
+  }catch{
+    $('list').replaceChildren(mk('div',{className:'empty'},'Impossible de charger les offres. ',mk('button',{type:'button',className:'link',textContent:'Réessayer',onclick:load})));
+  }
+}
+
+document.querySelector('[data-p=""]').onclick=()=>{prov='';syncChips();draw()};
+$('only').onclick=()=>{only=!only;syncChips();draw()};
+$('q').oninput=e=>{q=e.target.value;draw()};
+$('sort').onchange=e=>{sort=e.target.value;draw()};
+$('all').onclick=()=>{rows().forEach(o=>sel.add(o.key));draw()};
+$('none').onclick=()=>{rows().forEach(o=>sel.delete(o.key));draw()};
+$('email').value=store.get('email','');
+
+$('f').onsubmit=async e=>{
+  e.preventDefault();const m=$('msg');m.className='';m.textContent='';
+  if(!sel.size){m.className='err';m.textContent='Coche au moins une offre.';return}
+  $('btn').disabled=true;
+  try{
+    const r=await fetch('/api/subscribe',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({email:$('email').value,offers:[...sel]})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw Error(d.error||'Une erreur est survenue, réessaie.');
+    store.set('email',$('email').value);
+    m.className='good';m.textContent='Dernière étape : ouvre le mail que tu viens de recevoir et clique sur le lien de confirmation (regarde aussi dans les spams).';
+  }catch(x){m.className='err';m.textContent=x.message}
+  $('btn').disabled=false;
+};
+
+load();
+setInterval(()=>{tick()},30000);
+setInterval(load,120000);
+</script>
+</body>
+</html>

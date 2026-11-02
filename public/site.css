@@ -1,0 +1,87 @@
+:root{--bg:#070812;--panel:#0e1020;--line:#222647;--fg:#e9ecff;--mut:#8b91b8;--cy:#3de7ff;--vi:#8a5cff;--ok:#3dffa8;--ko:#ff6b86;--head:'Bricolage Grotesque',ui-sans-serif,system-ui,sans-serif}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;min-height:100vh;color:var(--fg);font:16px/1.55 ui-sans-serif,system-ui,-apple-system,'Segoe UI',sans-serif;background:radial-gradient(900px 420px at 8% -8%,rgba(138,92,255,.20),transparent),var(--bg);padding-bottom:7rem}
+a{color:var(--cy)}
+.wrap{max-width:1040px;margin:0 auto;padding:0 1.1rem}
+:focus-visible{outline:2px solid var(--cy);outline-offset:2px}
+
+/* ---- en-tête ---- */
+.hero{display:grid;grid-template-columns:1fr auto;gap:2rem;align-items:center;padding:3rem 0 2rem}
+h1{font:800 clamp(2.3rem,6.5vw,3.8rem)/1 var(--head);letter-spacing:-.035em;margin:0 0 .9rem}
+.lede{margin:0;color:var(--mut);max-width:46ch;font-size:1.05rem}
+.scan{margin:.9rem 0 0;color:var(--mut);font-size:.88rem}
+
+/* radar : seul élément animé de la page */
+.radar{position:relative;width:208px;height:208px;border-radius:50%;flex:none;
+  background:radial-gradient(circle,transparent 0 24%,var(--line) 24.4% 25.2%,transparent 25.6% 50%,var(--line) 50.4% 51.2%,transparent 51.6% 75%,var(--line) 75.4% 76.2%,transparent 76.6%);
+  border:1px solid var(--line)}
+.radar:before{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,rgba(61,231,255,.38),rgba(61,231,255,0) 26%);animation:sweep 5s linear infinite}
+.radar .n{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
+.radar b{font:800 3.4rem/1 var(--head);letter-spacing:-.04em}
+.radar b.some{color:var(--ok)}
+.radar span{color:var(--mut);font-size:.82rem;margin-top:.15rem}
+@keyframes sweep{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.radar:before{animation:none}html{scroll-behavior:auto}}
+
+/* ---- barre d'outils ---- */
+.tools{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;padding:1rem 0;border-top:1px solid var(--line)}
+.tools input[type=search]{flex:1 1 220px;min-width:0;padding:.65rem .9rem;color:var(--fg);font:inherit;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+select{padding:.65rem .8rem;color:var(--fg);font:inherit;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.chips{display:flex;gap:.45rem;flex-wrap:wrap;padding:0 0 1rem}
+.chip{padding:.4rem .85rem;font:inherit;font-size:.88rem;color:var(--mut);background:transparent;border:1px solid var(--line);border-radius:99px;cursor:pointer}
+.chip small{margin-left:.35rem;opacity:.75}
+.chip:hover{color:var(--fg)}
+.chip[aria-pressed=true]{color:var(--fg);border-color:var(--cy)}
+.link{background:none;border:0;padding:.4rem .2rem;color:var(--mut);font:inherit;font-size:.88rem;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.link:hover{color:var(--fg)}
+.spacer{flex:1}
+
+/* ---- liste des offres ---- */
+.list{border-top:1px solid var(--line)}
+.row{display:grid;grid-template-columns:28px minmax(0,1fr) minmax(130px,190px) 112px 92px;gap:.4rem 1rem;align-items:center;padding:.85rem .6rem;border-bottom:1px solid var(--line);cursor:pointer;transition:background .15s}
+.row:hover{background:rgba(255,255,255,.025)}
+.row.sel{background:rgba(138,92,255,.11);box-shadow:inset 3px 0 0 var(--vi)}
+.row input{width:18px;height:18px;margin:0;accent-color:var(--vi);cursor:pointer}
+.name{font-weight:600}
+.name em{font-style:normal;margin-left:.55rem;padding:.08rem .5rem;font-size:.74rem;font-weight:500;color:var(--mut);border:1px solid var(--line);border-radius:99px;white-space:nowrap}
+.specs{display:block;color:var(--mut);font-size:.88rem}
+.state{display:flex;gap:.5rem;align-items:baseline;font-size:.9rem}
+.state:before{content:"";flex:none;width:8px;height:8px;border-radius:50%;background:var(--ko);transform:translateY(-1px)}
+.state.ok{color:var(--ok)}.state.ok:before{background:var(--ok)}
+.state.ko{color:var(--mut)}
+.state i{font-style:normal;color:var(--fg);font-size:.82rem}
+.price{white-space:nowrap;text-align:right;font-variant-numeric:tabular-nums;color:var(--fg)}
+.price small{color:var(--mut)}
+.go{justify-self:end;font-size:.85rem;text-decoration:none;padding:.3rem .7rem;border:1px solid var(--line);border-radius:8px;color:var(--cy)}
+.go:hover{border-color:var(--cy)}
+.empty{padding:2.2rem .6rem;color:var(--mut)}
+.empty button{margin-left:.4rem}
+
+/* ---- barre d'inscription ---- */
+.dock{position:fixed;left:0;right:0;bottom:0;z-index:5;background:rgba(7,8,18,.93);backdrop-filter:blur(14px);border-top:1px solid var(--line);transform:translateY(105%);transition:transform .25s}
+.dock.on{transform:none}
+.dock form{max-width:1040px;margin:0 auto;padding:.8rem 1.1rem;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap}
+.dock .cnt{font-weight:600;white-space:nowrap}
+.dock input[type=email]{flex:1 1 230px;min-width:0;padding:.7rem .9rem;color:var(--fg);font:inherit;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.cta{padding:.7rem 1.3rem;font:600 .95rem inherit;font-family:inherit;color:#04121a;background:var(--cy);border:0;border-radius:10px;cursor:pointer}
+.cta:hover{filter:brightness(1.1)}.cta:disabled{opacity:.55;cursor:default}
+.dock .hint{flex-basis:100%;margin:0;color:var(--mut);font-size:.84rem}
+#msg{flex-basis:100%;margin:0;min-height:0;font-size:.9rem}
+#msg.good{color:var(--ok)}#msg.err{color:var(--ko)}
+
+/* ---- infos ---- */
+.faq{margin-top:3rem;max-width:62ch}
+.faq h2{font:700 1.3rem var(--head);margin:0 0 .6rem}
+details{border-bottom:1px solid var(--line);padding:.7rem 0}
+summary{cursor:pointer;font-weight:600}
+details p{margin:.5rem 0 0;color:var(--mut)}
+footer{margin-top:2.5rem;color:var(--mut);font-size:.85rem}
+
+@media(max-width:760px){
+  .hero{grid-template-columns:1fr;padding-top:2rem}
+  .radar{width:150px;height:150px;order:-1}.radar b{font-size:2.4rem}
+  .row{grid-template-columns:28px minmax(0,1fr) auto;grid-template-areas:"c n p" "c s s" "c g g"}
+  .row input{grid-area:c;align-self:start;margin-top:.2rem}
+  .row .main{grid-area:n}.row .price{grid-area:p}.row .state{grid-area:s}.row .go{grid-area:g;justify-self:start}
+}
