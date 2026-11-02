@@ -112,7 +112,7 @@ details p{margin:.5rem 0 0;color:var(--mut)}
 .foot p{margin:0 0 .4rem}
 .credit{color:var(--mut);font-size:.88rem}
 .credit a{color:var(--mut);text-underline-offset:3px}.credit a:hover{color:var(--fg)}
-.credit a[href*="github"]{color:var(--cy);font-weight:700;text-decoration:none}
+.who{color:var(--cy);font-weight:700}
 .hrt{color:var(--ko)}
 
 /* ---- pages de message et conditions ---- */
@@ -130,3 +130,24 @@ details p{margin:.5rem 0 0;color:var(--mut)}
 .legal p{color:#b9bfe6;margin:0 0 .8rem}
 .legal .lede{margin:.4rem 0 1rem}
 .legal .credit{margin-top:3rem;padding-top:1.2rem;border-top:1px solid var(--line)}
+
+/* navigation du haut : actions regroupees dans une seule pastille */
+.topnav{display:inline-flex;align-items:center;gap:2px;padding:3px;background:var(--panel);border:1px solid var(--line);border-radius:99px}
+.topnav .seg{position:relative;display:inline-flex;align-items:center;gap:.5rem;padding:.45rem 1rem;font-family:inherit;font-size:.9rem;font-weight:600;color:var(--fg);text-decoration:none;background:transparent;border:0;border-radius:99px;cursor:pointer;transition:background .15s}
+.topnav .seg:hover{background:rgba(61,231,255,.1)}
+.topnav .seg+.seg:before{content:"";position:absolute;left:-2px;top:24%;bottom:24%;width:1px;background:var(--line)}
+.topnav .ic{width:18px;height:18px;fill:none;stroke:var(--cy);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.topnav .helpbtn .q{width:20px;height:20px;font-size:.78rem}
+/* fenetre d'aide a onglets */
+dialog .in{max-height:calc(100vh - 3rem);overflow-y:auto}
+dialog .hdr{position:sticky;top:0;z-index:1;margin:-1.3rem -1.4rem .8rem;padding:1.3rem 1.4rem .7rem;background:var(--panel)}
+dialog .hdr .hd{margin-bottom:.8rem}
+.tabs{display:flex;gap:3px;padding:3px;background:var(--bg);border:1px solid var(--line);border-radius:12px}
+.tabs button{flex:1;padding:.55rem .6rem;font-family:inherit;font-size:.88rem;font-weight:600;color:var(--mut);background:transparent;border:0;border-radius:9px;cursor:pointer}
+.tabs button:hover{color:var(--fg)}
+.tabs button[aria-selected=true]{color:#04121a;background:var(--cy)}
+.how .intro{margin:0 0 .4rem;color:#b9bfe6}
+.cgu h2{font:700 1.02rem var(--head);margin:1.3rem 0 .3rem;color:var(--fg)}
+.cgu p{margin:0 0 .7rem;color:var(--mut);font-size:.93rem}
+.cgu .lede{margin:0 0 .4rem;font-size:.9rem}
+@media(max-width:480px){.topnav .seg{padding:.45rem .75rem;font-size:.85rem}}

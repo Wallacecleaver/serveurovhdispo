@@ -20,7 +20,6 @@ const C = { bg: '#05060f', card: '#0d1020', card2: '#141838', line: '#252a55', f
 const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 const YEAR = new Date().getFullYear();
 const AUTHOR = 'Wallace';
-const AUTHOR_URL = 'https://github.com/Wallacecleaver';
 const price = (n) => (Math.round(n * 100) / 100).toFixed(2).replace('.', ',');
 
 const TERMS = `Radar serveurs est un service gratuit et indépendant, créé par ${AUTHOR}. Il n’est affilié à aucun hébergeur (OVHcloud, Hetzner, Scaleway et les autres sont des marques de leurs propriétaires). Les stocks et les prix sont donnés à titre indicatif : ils peuvent changer sans préavis et un serveur affiché disponible peut être pris avant ta commande. Aucune alerte n’est garantie (retard, mail classé en spam, panne). Ton adresse sert uniquement à t’envoyer ces alertes et tu peux te désinscrire en un clic. En utilisant le service, tu acceptes les conditions d’utilisation.`;
@@ -39,7 +38,7 @@ function layout({ preheader, title, hero, body, publicUrl, unsubUrl }) {
 <tr><td style="padding:0 6px 18px;"><table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
 <td width="56" valign="middle">${logo}</td>
 <td valign="middle" style="font-family:${FONT};"><div style="font-size:18px;font-weight:800;letter-spacing:-.01em;color:${C.fg};">Radar serveurs</div><div style="font-size:12px;color:${C.dim};margin-top:1px;">Alertes de stock VPS</div></td>
-<td align="right" valign="middle" style="font-family:${FONT};font-size:12px;color:${C.dim};">by <a href="${AUTHOR_URL}" style="color:${C.cy};text-decoration:none;font-weight:700;">${AUTHOR}</a></td>
+<td align="right" valign="middle" style="font-family:${FONT};font-size:12px;color:${C.dim};">by <span style="color:${C.cy};text-decoration:none;font-weight:700;">${AUTHOR}</span></td>
 </tr></table></td></tr>
 
 <tr><td style="background:${C.card};border:1px solid ${C.line};border-radius:20px;overflow:hidden;">
@@ -52,7 +51,7 @@ function layout({ preheader, title, hero, body, publicUrl, unsubUrl }) {
 <tr><td style="padding:26px 12px 0;font-family:${FONT};text-align:center;">
 <div style="font-size:13px;line-height:1.7;">${links}</div>
 <div style="margin:18px auto 0;max-width:500px;font-size:11px;line-height:1.7;color:${C.dim};">${esc(TERMS)}</div>
-<div style="margin-top:18px;font-size:12px;color:${C.mut};">Fait avec <span style="color:#ff6b86;">&hearts;</span> par <a href="${AUTHOR_URL}" style="color:${C.cy};text-decoration:none;font-weight:700;">${AUTHOR}</a> &nbsp;&middot;&nbsp; &copy; ${YEAR} Radar serveurs</div>
+<div style="margin-top:18px;font-size:12px;color:${C.mut};">Fait avec <span style="color:#ff6b86;">&hearts;</span> par <span style="color:${C.cy};text-decoration:none;font-weight:700;">${AUTHOR}</span> &nbsp;&middot;&nbsp; &copy; ${YEAR} Radar serveurs</div>
 </td></tr>
 </table></td></tr></table></body></html>`;
 }
