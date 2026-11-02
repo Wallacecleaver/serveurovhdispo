@@ -1,4 +1,4 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><meta name="author" content="Wallace"><title>Admin · Radar serveurs</title><link rel="stylesheet" href="/style.css?v=6"></head>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><meta name="author" content="Wallace"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta name="theme-color" content="#05060f"><title>Admin · Radar serveurs</title><link rel="stylesheet" href="/style.css?v=7"></head>
 <body><main class="wrap" style="max-width:1100px"><div id="app"></div></main>
 <script>
 const $=id=>document.getElementById(id);
@@ -22,7 +22,7 @@ $('pw').focus();$('go').onclick=go;$('eye').onclick=()=>{const i=$('pw');const v
 
 const VIEWS=[['dash','◈','Vue d\u2019ensemble'],['cfg','⚙','Réglages'],['subs','✉','Inscrits'],['logs','☰','Journal'],['sec','🔒','Sécurité']];
 const credit=()=>mk('div',{className:'by'},'Fait avec ',mk('span',{className:'hrt',textContent:'♥'}),' par ',mk('b',{className:'who',textContent:'Wallace'}));
-function shell(){const side=mk('nav',{className:'card side'},mk('b',{textContent:'RADAR'}));
+function shell(){const side=mk('nav',{className:'card side'},mk('div',{className:'sidebrand'},mk('img',{src:'/logo.svg',width:30,height:30,alt:'Logo'}),mk('b',{textContent:'RADAR'})));
 for(const [id,ic,l] of VIEWS)side.append(mk('button',{className:'nav',id:'n-'+id,textContent:ic+'  '+l,onclick:()=>show(id)}));
 side.append(mk('a',{className:'nav ext',href:'/',target:'_blank',rel:'noopener',textContent:'↗  Voir le site'}),credit());
 $('app').replaceChildren(mk('div',{className:'app'},side,mk('div',{id:'view'})));const h=location.hash.slice(1);show(VIEWS.some(x=>x[0]===h)?h:'dash')}

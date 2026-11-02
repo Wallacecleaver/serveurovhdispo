@@ -152,3 +152,9 @@ dialog .hdr .hd{margin-bottom:.8rem}
 .cgu .lede{margin:0 0 .4rem;font-size:.9rem}
 .topnav .dc img{display:block;width:22px;height:22px;border-radius:6px}
 @media(max-width:480px){.topnav .seg{padding:.45rem .75rem;font-size:.85rem}.topnav .ic{display:none}.topnav .dc .lbl{display:none}}
+
+/* Logo */
+.brandrow{display:flex;align-items:center;gap:.9rem;margin:0 0 .2rem}
+.brandrow h1{margin:0}
+.brand{flex:none;border-radius:22%;filter:drop-shadow(0 6px 22px rgba(138,92,255,.4))}
+.brand.center{display:block;margin:0 auto 1rem}
