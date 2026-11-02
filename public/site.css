@@ -22,7 +22,7 @@ h1{font:800 clamp(2.3rem,6.5vw,3.8rem)/1 var(--head);letter-spacing:-.035em;marg
 .radar b.some{color:var(--ok)}
 .radar span{color:var(--mut);font-size:.82rem;margin-top:.15rem}
 @keyframes sweep{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){.radar:before{animation:none}html{scroll-behavior:auto}}
+@media(prefers-reduced-motion:reduce){.radar:before{animation-duration:16s}html{scroll-behavior:auto}}
 
 /* ---- barre d'outils ---- */
 .tools{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;padding:1rem 0;border-top:1px solid var(--line)}
