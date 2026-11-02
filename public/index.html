@@ -4,14 +4,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Radar serveurs : alerte dès qu'un serveur est en stock</title>
-<meta name="description" content="Choisis les serveurs OVH, Hetzner ou Scaleway que tu veux et reçois un mail dès qu'ils sont de nouveau en stock.">
+<meta name="description" content="Coche les serveurs (VPS) qui t'intéressent et reçois un mail dès qu'ils sont de nouveau en stock.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&display=swap">
-<link rel="stylesheet" href="/site.css?v=3">
+<link rel="stylesheet" href="/site.css?v=4">
 </head>
 <body>
 <main class="wrap">
+  <div class="top"><button type="button" class="helpbtn" id="hb" aria-haspopup="dialog"><span class="q" aria-hidden="true">?</span> Aide</button></div>
   <header class="hero">
     <div>
       <h1>Radar serveurs</h1>
@@ -22,6 +23,12 @@
       <div class="n"><b id="nb">–</b><span id="nbl">dispo</span></div>
     </div>
   </header>
+
+  <ol class="steps" aria-label="Comment ça marche">
+    <li><b>1</b><span>Coche les serveurs qui t'intéressent</span></li>
+    <li><b>2</b><span>Entre ton mail dans la barre en bas</span></li>
+    <li><b>3</b><span>Confirme, puis reçois un mail dès qu'ils sont en stock</span></li>
+  </ol>
 
   <section aria-label="Offres">
     <div class="tools">
@@ -43,15 +50,19 @@
     <div class="list" id="list" aria-live="polite"><div class="empty">Chargement des offres…</div></div>
   </section>
 
-  <section class="faq">
-    <h2>Questions fréquentes</h2>
-    <details><summary>Comment ça marche ?</summary><p>Les stocks sont relus toutes les 5 minutes. Quand une offre que tu as cochée passe de indispo à dispo, tu reçois un mail. Si elle repasse indispo puis revient, tu es prévenu à nouveau.</p></details>
+  <footer>Les stocks sont indicatifs : un serveur affiché dispo peut être pris avant ta commande.</footer>
+</main>
+
+<dialog id="help" aria-labelledby="ht">
+  <div class="in">
+    <div class="hd"><h2 id="ht">Aide</h2><button type="button" class="x" id="hx" aria-label="Fermer l'aide">✕</button></div>
+    <h3>Questions fréquentes</h3>
+    <details open><summary>Comment ça marche ?</summary><p>Les stocks sont relus toutes les 5 minutes. Quand une offre que tu as cochée passe de indispo à dispo, tu reçois un mail. Si elle repasse indispo puis revient, tu es prévenu à nouveau.</p></details>
     <details><summary>Je coche une offre déjà dispo, que se passe-t-il ?</summary><p>Tu reçois un mail tout de suite pour te dire qu'elle est disponible, puis de nouveau si elle repasse indispo et revient.</p></details>
     <details><summary>Comment me désinscrire ?</summary><p>Chaque mail contient un lien de désinscription. Un clic suffit, ton adresse est supprimée.</p></details>
     <details><summary>Que faites-vous de mon adresse mail ?</summary><p>Elle sert uniquement à t'envoyer ces alertes. Tu dois d'abord confirmer ton adresse avec un lien reçu par mail.</p></details>
-  </section>
-  <footer>Les stocks sont indicatifs : un serveur affiché dispo peut être pris avant ta commande.</footer>
-</main>
+  </div>
+</dialog>
 
 <div class="dock" id="dock">
   <form id="f">
@@ -160,6 +171,16 @@ $('f').onsubmit=async e=>{
   }catch(x){m.className='err';m.textContent=x.message}
   $('btn').disabled=false;
 };
+
+const hd=$('help');
+const openHelp=()=>{if(!hd.open)hd.showModal();store.set('helpSeen',1);$('hb').classList.remove('new')};
+hd.addEventListener('close',()=>{if(location.hash==='#aide')history.replaceState(null,'',location.pathname+location.search)});
+$('hb').onclick=()=>{history.replaceState(null,'','#aide');openHelp()};
+$('hx').onclick=()=>hd.close();
+hd.addEventListener('click',e=>{if(e.target===hd)hd.close()});
+if(!store.get('helpSeen',0))$('hb').classList.add('new');
+if(location.hash==='#aide')openHelp();
+addEventListener('hashchange',()=>{if(location.hash==='#aide')openHelp()});
 
 load();
 setInterval(()=>{tick()},30000);

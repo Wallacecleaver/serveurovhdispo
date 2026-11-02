@@ -58,3 +58,6 @@ a.nav{text-decoration:none;font-size:.95rem}.nav.ext{margin-top:.6rem;border-top
 .toast{padding:.7rem 1rem;border-radius:10px;background:#0c1030;border:1px solid var(--line);box-shadow:0 8px 30px rgba(0,0,0,.5);animation:ti .25s ease-out}.toast.good{border-color:var(--ok)}.toast.err{border-color:var(--ko)}
 @keyframes ti{from{opacity:0;transform:translateY(8px)}}
 td.good{color:var(--ok)}td.meta{color:var(--mut)}
+
+.fw{display:flex;gap:.5rem}.fw input{flex:1;min-width:0}.fw .eye{padding:.5rem .9rem}
+td.cell details{border:0;padding:0}td.cell summary{cursor:pointer;color:var(--fg)}td.cell .meta{margin-top:.3rem;max-width:380px;word-break:break-word}

@@ -7,7 +7,7 @@ a{color:var(--cy)}
 :focus-visible{outline:2px solid var(--cy);outline-offset:2px}
 
 /* ---- en-tête ---- */
-.hero{display:grid;grid-template-columns:1fr auto;gap:2rem;align-items:center;padding:3rem 0 2rem}
+.hero{display:grid;grid-template-columns:1fr auto;gap:2rem;align-items:center;padding:1.2rem 0 1.6rem}
 h1{font:800 clamp(2.3rem,6.5vw,3.8rem)/1 var(--head);letter-spacing:-.035em;margin:0 0 .9rem}
 .lede{margin:0;color:var(--mut);max-width:46ch;font-size:1.05rem}
 .scan{margin:.9rem 0 0;color:var(--mut);font-size:.88rem}
@@ -70,16 +70,35 @@ select{padding:.65rem .8rem;color:var(--fg);font:inherit;background:var(--panel)
 #msg{flex-basis:100%;margin:0;min-height:0;font-size:.9rem}
 #msg.good{color:var(--ok)}#msg.err{color:var(--ko)}
 
-/* ---- infos ---- */
-.faq{margin-top:3rem;max-width:62ch}
-.faq h2{font:700 1.3rem var(--head);margin:0 0 .6rem}
+/* ---- aide ---- */
+.top{display:flex;justify-content:flex-end;padding-top:1.1rem}
+.helpbtn{display:inline-flex;align-items:center;gap:.5rem;padding:.5rem 1rem .5rem .6rem;font:600 .92rem inherit;font-family:inherit;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:99px;cursor:pointer;transition:border-color .15s}
+.helpbtn:hover{border-color:var(--cy)}
+.helpbtn .q{display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--cy);color:#04121a;font-weight:800;font-size:.85rem}
+.helpbtn.new .q{animation:ping 2s infinite}
+@keyframes ping{0%{box-shadow:0 0 0 0 rgba(61,231,255,.6)}70%,100%{box-shadow:0 0 0 10px transparent}}
+dialog{width:min(560px,calc(100vw - 2rem));max-height:calc(100vh - 3rem);padding:0;color:var(--fg);background:var(--panel);border:1px solid var(--line);border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,.6)}
+dialog::backdrop{background:rgba(3,4,12,.72);backdrop-filter:blur(4px)}
+dialog .in{padding:1.3rem 1.4rem 1.5rem}
+dialog .hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:.6rem}
+dialog h2{font:800 1.5rem var(--head);margin:0;letter-spacing:-.02em}
+dialog h3{margin:1rem 0 .2rem;color:var(--mut);font:600 .78rem ui-monospace,monospace;letter-spacing:.14em;text-transform:uppercase}
+.x{width:34px;height:34px;display:grid;place-items:center;color:var(--mut);background:transparent;border:1px solid var(--line);border-radius:50%;cursor:pointer;font:inherit}
+.x:hover{color:var(--fg);border-color:var(--cy)}
 details{border-bottom:1px solid var(--line);padding:.7rem 0}
+details:last-child{border-bottom:0}
 summary{cursor:pointer;font-weight:600}
 details p{margin:.5rem 0 0;color:var(--mut)}
+
+/* ---- étapes ---- */
+.steps{list-style:none;margin:0 0 1.4rem;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem}
+.steps li{display:flex;gap:.7rem;align-items:center;padding:.8rem .9rem;background:var(--panel);border:1px solid var(--line);border-radius:12px;font-size:.93rem}
+.steps b{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;color:#04121a;background:linear-gradient(135deg,var(--cy),var(--vi));font:800 .9rem var(--head)}
 footer{margin-top:2.5rem;color:var(--mut);font-size:.85rem}
 
 @media(max-width:760px){
-  .hero{grid-template-columns:1fr;padding-top:2rem}
+  .steps{grid-template-columns:1fr}
+  .hero{grid-template-columns:1fr;padding-top:1rem}
   .radar{width:150px;height:150px;order:-1}.radar b{font-size:2.4rem}
   .row{grid-template-columns:28px minmax(0,1fr) auto;grid-template-areas:"c n p" "c s s" "c g g"}
   .row input{grid-area:c;align-self:start;margin-top:.2rem}

@@ -1,4 +1,4 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Admin · Radar serveurs</title><link rel="stylesheet" href="/style.css?v=3"></head>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Admin · Radar serveurs</title><link rel="stylesheet" href="/style.css?v=4"></head>
 <body><main class="wrap" style="max-width:1100px"><div id="app"></div></main>
 <script>
 const $=id=>document.getElementById(id);
@@ -11,7 +11,7 @@ const ago=t=>{if(!t)return '—';const s=Math.round((Date.now()-t)/1000);if(s<60
 const stat=(l,v)=>mk('div',{className:'card stat'},mk('b',{textContent:v}),mk('span',{textContent:l}));
 const chips=(opts,cur,on)=>{const w=mk('div',{className:'bar',style:'margin:0'});const draw=()=>w.replaceChildren(...opts.map(([k,l])=>mk('button',{className:'chip'+(k===cur?' on':''),textContent:l,onclick:()=>{cur=k;draw();on(k)}})));draw();return w};
 let cur='dash',timer;
-const field=(id,label,secret,ph)=>mk('div',{},mk('label',{className:'f',htmlFor:id,textContent:label}),mk('input',{id,type:'text',className:secret?'pw':'',autocomplete:'off',placeholder:ph||''}));
+const field=(id,label,secret,ph)=>mk('div',{},mk('label',{className:'f',htmlFor:id,textContent:label}),secret?mk('div',{className:'fw'},mk('input',{id,type:'text',className:'pw',autocomplete:'off',placeholder:ph||''}),mk('button',{type:'button',className:'ghost eye',textContent:'Voir',onclick:e=>{const i=$(id).classList.toggle('show');e.target.textContent=i?'Cacher':'Voir'}})):mk('input',{id,type:'text',autocomplete:'off',placeholder:ph||''}));
 const section=(title,desc,...k)=>mk('div',{className:'card sec'},mk('h3',{textContent:title}),mk('p',{textContent:desc}),...k);
 
 async function boot(){const s=await api('/state');s.authed?shell():gate(s.setup)}
@@ -25,11 +25,11 @@ function shell(){const side=mk('nav',{className:'card side'},mk('b',{textContent
 for(const [id,ic,l] of VIEWS)side.append(mk('button',{className:'nav',id:'n-'+id,textContent:ic+'  '+l,onclick:()=>show(id)}));
 side.append(mk('a',{className:'nav ext',href:'/',target:'_blank',rel:'noopener',textContent:'↗  Voir le site'}));
 $('app').replaceChildren(mk('div',{className:'app'},side,mk('div',{id:'view'})));const h=location.hash.slice(1);show(VIEWS.some(x=>x[0]===h)?h:'dash')}
-function show(v){clearInterval(timer);cur=v;history.replaceState(null,'','#'+v);document.title=VIEWS.find(x=>x[0]===v)[2]+' · Admin Radar';VIEWS.forEach(([id])=>$('n-'+id).classList.toggle('on',id===v));$('view').replaceChildren(mk('h1',{textContent:VIEWS.find(x=>x[0]===v)[2]}));Promise.resolve().then(()=>({dash,cfg,subs,logs,sec})[v]()).catch(e=>$('view')&&$('view').append(mk('div',{className:'card err',textContent:e.message})))}
+function show(v){clearInterval(timer);document.onkeydown=null;cur=v;history.replaceState(null,'','#'+v);document.title=VIEWS.find(x=>x[0]===v)[2]+' · Admin Radar';VIEWS.forEach(([id])=>$('n-'+id).classList.toggle('on',id===v));$('view').replaceChildren(mk('h1',{textContent:VIEWS.find(x=>x[0]===v)[2]}));Promise.resolve().then(()=>({dash,cfg,subs,logs,sec})[v]()).catch(e=>$('view')&&$('view').append(mk('div',{className:'card err',textContent:e.message})))}
 
 async function dash(){$('view').append(mk('div',{id:'top'}));await paintDash();addChk();
 timer=setInterval(()=>{if(cur==='dash'&&!document.hidden&&!$('chk')?.disabled)paintDash().catch(()=>{})},30000)}
-async function paintDash(){const [{status:s,subs},c]=await Promise.all([api('/status'),api('/config')]);const top=$('top');if(!top)return;
+async function paintDash(){const [{status:s,subs},c,lg]=await Promise.all([api('/status'),api('/config'),api('/logs')]);const top=$('top');if(!top)return;
 const PN={ovh:'OVH VPS',hetzner:'Hetzner',scaleway:'Scaleway'};const ids=Object.keys(PN).filter(k=>s[k]&&!s[k].skipped);const tot=ids.reduce((a,k)=>a+(s[k].count||0),0),av=ids.reduce((a,k)=>a+(s[k].available||0),0);
 const row=k=>{const x=s[k];if(!x||x.skipped)return mk('div',{className:'prow'},mk('span',{className:'dot off'}),mk('b',{textContent:PN[k]}),mk('span',{className:'meta',textContent:'non configuré'}));
 return mk('div',{className:'prow'},mk('span',{className:'dot '+(x.ok?(x.available?'ok':'idle'):'ko')}),mk('b',{textContent:PN[k]}),mk('span',{className:x.ok?'meta':'err',textContent:x.ok?`${x.count} offres · ${x.available} dispo`:x.error}))};
@@ -37,7 +37,8 @@ const running=$('chk')?.disabled;
 top.replaceChildren(mk('div',{className:'stats'},stat('Offres suivies',tot),stat('Dispo maintenant',av),stat('Inscrits',subs),stat('Dernier scan',s.lastRun?ago(s.lastRun):'—')),
 section('Fournisseurs',c.paused?'⏸ Alertes en pause : les scans continuent mais rien n\u2019est envoyé.':'Surveillance active, scan toutes les 5 minutes. Cette vue se met à jour toute seule.',mk('div',{},...Object.keys(PN).map(row)),s.mailError?mk('div',{className:'err',style:'margin-top:.6rem',textContent:'Dernière erreur mail : '+s.mailError}):'',
 mk('div',{className:'bar',style:'margin-top:1rem'},mk('button',{id:'chk',disabled:running,textContent:running?'Scan en cours…':'Scanner maintenant',onclick:async e=>{e.target.disabled=true;e.target.textContent='Scan en cours…';try{await api('/check',{});toast('Scan terminé ✔')}catch(x){toast(x.message,0)}await paintDash()}}),
-mk('button',{className:'ghost',textContent:c.paused?'▶ Reprendre les alertes':'⏸ Mettre en pause',onclick:async()=>{await api('/config',{paused:!c.paused});toast(c.paused?'Alertes reprises ✔':'Alertes en pause ⏸');paintDash()}})),mk('div',{id:'n1',className:'note'})))}
+mk('button',{className:'ghost',textContent:c.paused?'▶ Reprendre les alertes':'⏸ Mettre en pause',onclick:async()=>{await api('/config',{paused:!c.paused});toast(c.paused?'Alertes reprises ✔':'Alertes en pause ⏸');paintDash()}})),mk('div',{id:'n1',className:'note'})),
+section('Activité récente','Les derniers événements du journal.',...(lg.slice(0,6).length?lg.slice(0,6).map(e=>mk('div',{className:'lg'},mk('time',{textContent:ago(e.t)}),mk('span',{className:'lv '+e.l,textContent:e.l}),mk('span',{textContent:e.m}))):[mk('div',{className:'meta',textContent:'Rien pour le moment.'})]),mk('div',{className:'bar',style:'margin:.8rem 0 0'},mk('button',{className:'ghost',textContent:'Voir tout le journal',onclick:()=>show('logs')})))) }
 
 async function chk(s,id,value,mailFrom){note(id,'Vérification…',1);try{const r=await api('/verify',{service:s,value,mailFrom});note(id,(r.warn?'⚠ ':'✔ ')+r.detail,1)}catch(e){note(id,'✘ '+e.message)}}
 function addChk(){const out=mk('div',{id:'vl',style:'margin-top:1rem'});$('view').append(section('Vérification des clés','Teste en direct Brevo, Hetzner, Scaleway, Discord et OVH avec ce qui est enregistré.',mk('button',{textContent:'Tout vérifier',onclick:async e=>{e.target.disabled=true;out.replaceChildren();for(const [s,n] of [['brevo','Brevo'],['hetzner','Hetzner'],['scaleway','Scaleway'],['discord','Discord'],['ovh','OVH']]){let t,c;try{const r=await api('/verify',{service:s});t=(r.skip?'— ':r.warn?'⚠ ':'✔ ')+n+' : '+r.detail;c=r.skip?'meta':r.warn?'meta':'good'}catch(x){t='✘ '+n+' : '+x.message;c='err'}out.append(mk('div',{className:c,textContent:t,style:'padding:.25rem 0'}))}e.target.disabled=false}}),out))}
@@ -50,9 +51,9 @@ section('Hetzner Cloud (optionnel)','Token API en lecture seule (il faut un comp
 section('Scaleway (optionnel)','Clé secrète API Scaleway (lecture), nécessaire pour surveiller Scaleway.',field('scaleway','Clé secrète',1,ph(c.scaleway)),mk('button',{className:'ghost',style:'margin-top:.8rem',textContent:'Vérifier la clé',onclick:()=>chk('scaleway','n7',$('scaleway').value)}),mk('div',{id:'n7',className:'note'})),
 section('Discord (optionnel)','Message direct dès qu\u2019une offre passe en dispo, sans passer par les mails.',field('discord','URL du webhook',1,ph(c.discord)),mk('button',{className:'ghost',style:'margin-top:.8rem',textContent:'Vérifier le webhook',onclick:()=>chk('discord','n6',$('discord').value)}),mk('div',{id:'n6',className:'note'})),
 section('Général','',field('publicUrl','URL publique du site (liens des mails)',0)),
-mk('div',{className:'bar'},mk('button',{textContent:'Enregistrer',onclick:async()=>{const b={mailFrom:$('mailFrom').value,replyTo:$('replyTo').value,mailName:$('mailName').value,publicUrl:$('publicUrl').value};for(const k of ['brevoKey','hcloud','scaleway','discord']){const x=$(k).value.trim();if(x==='-')b[k]=null;else if(x)b[k]=x}
+mk('div',{className:'bar'},mk('button',{textContent:'Enregistrer (Ctrl+S)',onclick:window.saveCfg=async()=>{const b={mailFrom:$('mailFrom').value,replyTo:$('replyTo').value,mailName:$('mailName').value,publicUrl:$('publicUrl').value};for(const k of ['brevoKey','hcloud','scaleway','discord']){const x=$(k).value.trim();if(x==='-')b[k]=null;else if(x)b[k]=x}
 try{await api('/config',b);toast('Réglages enregistrés ✔');show('cfg')}catch(e){note('n2',e.message)}}}),mk('span',{className:'meta',textContent:'Champ secret vide = inchangé · tape « - » pour le supprimer'})),mk('div',{id:'n2',className:'note'}));
-$('mailFrom').value=c.mailFrom;$('replyTo').value=c.replyTo;$('mailName').value=c.mailName;$('publicUrl').value=c.publicUrl}
+document.onkeydown=e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='s'){e.preventDefault();window.saveCfg()}};v.oninput=()=>note('n2','Modifications non enregistrées',0);$('mailFrom').value=c.mailFrom;$('replyTo').value=c.replyTo;$('mailName').value=c.mailName;$('publicUrl').value=c.publicUrl}
 
 async function subs(){const l=await api('/subs');const v=$('view');
 if(!l.length)return v.append(mk('div',{className:'card',textContent:'Aucun inscrit pour le moment.'}));
@@ -61,11 +62,11 @@ const box=mk('div',{className:'card',style:'overflow-x:auto'});
 const draw=()=>{const r=l.filter(x=>(f==='all'||(f==='ok')===!!x.confirmed)&&x.email.toLowerCase().includes(q));
 if(!r.length)return box.replaceChildren(mk('div',{className:'meta',textContent:'Aucun résultat.'}));
 const t=mk('table',{},mk('tr',{},...['Email','Statut','Offres',''].map(x=>mk('th',{textContent:x}))));
-for(const s of r)t.append(mk('tr',{},mk('td',{textContent:s.email}),mk('td',{className:s.confirmed?'good':'meta',textContent:s.confirmed?'✔ confirmé':'en attente'}),mk('td',{textContent:s.offers}),mk('td',{},mk('button',{className:'red',textContent:'Supprimer',onclick:async()=>{if(confirm('Supprimer '+s.email+' ?')){try{await api('/subs/'+s.id,{});toast('Inscrit supprimé');show('subs')}catch(e){toast(e.message,0)}}}}))));
+for(const s of r)t.append(mk('tr',{},mk('td',{textContent:s.email}),mk('td',{className:s.confirmed?'good':'meta',textContent:s.confirmed?'✔ confirmé':'en attente'}),mk('td',{className:'cell'},mk('details',{},mk('summary',{textContent:s.offers}),mk('div',{className:'meta',textContent:(s.keys||[]).join(', ')||'—'}))),mk('td',{},mk('button',{className:'red',textContent:'Supprimer',onclick:async()=>{if(confirm('Supprimer '+s.email+' ?')){try{await api('/subs/'+s.id,{});toast('Inscrit supprimé');show('subs')}catch(e){toast(e.message,0)}}}}))));
 box.replaceChildren(t)};
 const exp=()=>{const csv='email;statut;offres\n'+l.map(x=>[x.email,x.confirmed?'confirme':'en attente',x.offers].join(';')).join('\n');const a=mk('a',{href:URL.createObjectURL(new Blob([csv],{type:'text/csv'})),download:'inscrits.csv'});document.body.append(a);a.click();a.remove()};
 v.append(mk('div',{className:'stats'},stat('Total',l.length),stat('Confirmés',ok),stat('En attente',l.length-ok)),
-mk('div',{className:'bar'},mk('input',{type:'text',placeholder:'Chercher un email…',style:'max-width:260px',oninput:e=>{q=e.target.value.trim().toLowerCase();draw()}}),chips([['all','Tous'],['ok','Confirmés'],['wait','En attente']],f,k=>{f=k;draw()}),mk('button',{className:'ghost',textContent:'⬇ Export CSV',onclick:exp})),box);draw()}
+mk('div',{className:'bar'},mk('input',{type:'text',placeholder:'Chercher un email…',style:'max-width:260px',oninput:e=>{q=e.target.value.trim().toLowerCase();draw()}}),chips([['all','Tous'],['ok','Confirmés'],['wait','En attente']],f,k=>{f=k;draw()}),mk('button',{className:'ghost',textContent:'⬇ Export CSV',onclick:exp}),l.length-ok?mk('button',{className:'ghost',textContent:'🧹 Supprimer les non confirmés ('+(l.length-ok)+')',onclick:async()=>{if(!confirm('Supprimer les '+(l.length-ok)+' inscrits non confirmés ?'))return;try{for(const x of l.filter(x=>!x.confirmed))await api('/subs/'+x.id,{});toast('Nettoyage terminé ✔');show('subs')}catch(e){toast(e.message,0)}}}):''),box);draw()}
 
 async function logs(){const l=await api('/logs');const v=$('view');let q='',f='all';
 const box=mk('div',{className:'card'});

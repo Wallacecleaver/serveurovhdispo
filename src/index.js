@@ -199,7 +199,7 @@ async function admin(request, env, path) {
     try { await sendMail(await getCfg(env), { to: String(body.to || ''), subject: 'Test alertes serveurs', html: '<p>✅ Brevo fonctionne.</p>' }); await log(env, 'ok', 'Mail de test envoyé à ' + body.to); return json({ ok: true }); }
     catch (e) { await log(env, 'error', 'Test mail : ' + e.message); return json({ error: e.message }, 502); }
   }
-  if (path === '/subs' && request.method === 'GET') return json((await getSubs(env)).map(({ id, email, confirmed, offers }) => ({ id, email, confirmed, offers: offers.length })));
+  if (path === '/subs' && request.method === 'GET') return json((await getSubs(env)).map(({ id, email, confirmed, offers }) => ({ id, email, confirmed, offers: offers.length, keys: offers })));
   if (path.startsWith('/subs/') && request.method === 'POST') { await putSubs(env, (await getSubs(env)).filter((s) => s.id !== path.slice(6))); return json({ ok: true }); }
   if (path === '/verify' && request.method === 'POST') {
     const cfg = await getCfg(env), s = body.service, v = typeof body.value === 'string' && body.value.trim() ? body.value.trim() : null;
