@@ -16,13 +16,13 @@ h1{font:800 clamp(2.3rem,6.5vw,3.8rem)/1 var(--head);letter-spacing:-.035em;marg
 .radar{position:relative;width:208px;height:208px;border-radius:50%;flex:none;
   background:radial-gradient(circle,transparent 0 24%,var(--line) 24.4% 25.2%,transparent 25.6% 50%,var(--line) 50.4% 51.2%,transparent 51.6% 75%,var(--line) 75.4% 76.2%,transparent 76.6%);
   border:1px solid var(--line)}
-.radar:before{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,rgba(61,231,255,.38),rgba(61,231,255,0) 26%);animation:sweep 5s linear infinite}
+.radar:before{content:"";position:absolute;inset:0;border-radius:50%;background:conic-gradient(from 0deg,rgba(61,231,255,.38),rgba(61,231,255,0) 26%);transform-origin:50% 50%;will-change:transform;animation:sweep 5s linear infinite}
 .radar .n{position:absolute;inset:0;display:grid;place-content:center;text-align:center}
 .radar b{font:800 3.4rem/1 var(--head);letter-spacing:-.04em}
 .radar b.some{color:var(--ok)}
 .radar span{color:var(--mut);font-size:.82rem;margin-top:.15rem}
 @keyframes sweep{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){.radar:before{animation-duration:16s}html{scroll-behavior:auto}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
 
 /* ---- barre d'outils ---- */
 .tools{display:flex;gap:.6rem;flex-wrap:wrap;align-items:center;padding:1rem 0;border-top:1px solid var(--line)}
