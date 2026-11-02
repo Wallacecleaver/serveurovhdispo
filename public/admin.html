@@ -1,11 +1,16 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Admin · Radar serveurs</title><link rel="stylesheet" href="/style.css"></head>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>Admin · Radar serveurs</title><link rel="stylesheet" href="/style.css?v=3"></head>
 <body><main class="wrap" style="max-width:1100px"><div id="app"></div></main>
 <script>
 const $=id=>document.getElementById(id);
-const api=async(p,b)=>{const r=await fetch('/api/admin'+p,b===undefined?{}:{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});const d=await r.json().catch(()=>({}));if(!r.ok)throw Error(d.error||'Erreur '+r.status);return d};
+const api=async(p,b)=>{const r=await fetch('/api/admin'+p,b===undefined?{}:{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(b)});const d=await r.json().catch(()=>({}));if(r.status===401&&!['/login','/setup','/password'].includes(p)){boot();throw Error('Session expirée, reconnecte-toi')}if(!r.ok)throw Error(d.error||'Erreur '+r.status);return d};
 const mk=(t,p={},...k)=>{const e=Object.assign(document.createElement(t),p);k.forEach(x=>e.append(x));return e};
 const note=(id,t,ok)=>{const e=$(id);if(e){e.className='note '+(ok?'good':'err');e.textContent=t}};
 const fmt=t=>new Date(t).toLocaleString('fr-FR');
+const toast=(t,ok=1)=>{let w=$('toasts');if(!w){w=mk('div',{id:'toasts'});document.body.append(w)}const e=mk('div',{className:'toast '+(ok?'good':'err'),textContent:t});w.append(e);setTimeout(()=>e.remove(),3500)};
+const ago=t=>{if(!t)return '—';const s=Math.round((Date.now()-t)/1000);if(s<60)return 'il y a '+Math.max(s,0)+' s';const m=Math.round(s/60);if(m<60)return 'il y a '+m+' min';const h=Math.round(m/60);return h<48?'il y a '+h+' h':fmt(t)};
+const stat=(l,v)=>mk('div',{className:'card stat'},mk('b',{textContent:v}),mk('span',{textContent:l}));
+const chips=(opts,cur,on)=>{const w=mk('div',{className:'bar',style:'margin:0'});const draw=()=>w.replaceChildren(...opts.map(([k,l])=>mk('button',{className:'chip'+(k===cur?' on':''),textContent:l,onclick:()=>{cur=k;draw();on(k)}})));draw();return w};
+let cur='dash',timer;
 const field=(id,label,secret,ph)=>mk('div',{},mk('label',{className:'f',htmlFor:id,textContent:label}),mk('input',{id,type:'text',className:secret?'pw':'',autocomplete:'off',placeholder:ph||''}));
 const section=(title,desc,...k)=>mk('div',{className:'card sec'},mk('h3',{textContent:title}),mk('p',{textContent:desc}),...k);
 
@@ -13,23 +18,26 @@ async function boot(){const s=await api('/state');s.authed?shell():gate(s.setup)
 function gate(setup){const a=$('app');a.replaceChildren(mk('h1',{textContent:'CONSOLE ADMIN'}),mk('p',{className:'sub',textContent:setup?'Connexion':'Première utilisation : choisis ton mot de passe admin (10 caractères min).'}),
 mk('div',{className:'card',style:'max-width:420px'},mk('input',{id:'pw',type:'text',className:'pw',autocomplete:'off',placeholder:'Mot de passe'}),mk('div',{className:'bar',style:'margin-top:.8rem'},mk('button',{id:'go',textContent:setup?'Entrer':'Créer le compte admin'}),mk('button',{type:'button',className:'ghost',id:'eye',textContent:'Voir'})),mk('div',{id:'m',className:'note'})));
 const go=async()=>{try{await api(setup?'/login':'/setup',{password:$('pw').value});boot()}catch(e){note('m',e.message)}};
-$('go').onclick=go;$('eye').onclick=()=>$('pw').classList.toggle('show');$('pw').onkeydown=e=>e.key==='Enter'&&go()}
+$('pw').focus();$('go').onclick=go;$('eye').onclick=()=>$('pw').classList.toggle('show');$('pw').onkeydown=e=>e.key==='Enter'&&go()}
 
 const VIEWS=[['dash','◈','Vue d\u2019ensemble'],['cfg','⚙','Réglages'],['subs','✉','Inscrits'],['logs','☰','Journal'],['sec','🔒','Sécurité']];
 function shell(){const side=mk('nav',{className:'card side'},mk('b',{textContent:'RADAR'}));
 for(const [id,ic,l] of VIEWS)side.append(mk('button',{className:'nav',id:'n-'+id,textContent:ic+'  '+l,onclick:()=>show(id)}));
-$('app').replaceChildren(mk('div',{className:'app'},side,mk('div',{id:'view'})));show('dash')}
-function show(v){VIEWS.forEach(([id])=>$('n-'+id).classList.toggle('on',id===v));$('view').replaceChildren(mk('h1',{textContent:VIEWS.find(x=>x[0]===v)[2]}));({dash,cfg,subs,logs,sec})[v]()}
+side.append(mk('a',{className:'nav ext',href:'/',target:'_blank',rel:'noopener',textContent:'↗  Voir le site'}));
+$('app').replaceChildren(mk('div',{className:'app'},side,mk('div',{id:'view'})));const h=location.hash.slice(1);show(VIEWS.some(x=>x[0]===h)?h:'dash')}
+function show(v){clearInterval(timer);cur=v;history.replaceState(null,'','#'+v);document.title=VIEWS.find(x=>x[0]===v)[2]+' · Admin Radar';VIEWS.forEach(([id])=>$('n-'+id).classList.toggle('on',id===v));$('view').replaceChildren(mk('h1',{textContent:VIEWS.find(x=>x[0]===v)[2]}));Promise.resolve().then(()=>({dash,cfg,subs,logs,sec})[v]()).catch(e=>$('view')&&$('view').append(mk('div',{className:'card err',textContent:e.message})))}
 
-async function dash(){const {status:s,subs}=await api('/status');const c=await api('/config');
+async function dash(){$('view').append(mk('div',{id:'top'}));await paintDash();addChk();
+timer=setInterval(()=>{if(cur==='dash'&&!document.hidden&&!$('chk')?.disabled)paintDash().catch(()=>{})},30000)}
+async function paintDash(){const [{status:s,subs},c]=await Promise.all([api('/status'),api('/config')]);const top=$('top');if(!top)return;
 const PN={ovh:'OVH VPS',hetzner:'Hetzner',scaleway:'Scaleway'};const ids=Object.keys(PN).filter(k=>s[k]&&!s[k].skipped);const tot=ids.reduce((a,k)=>a+(s[k].count||0),0),av=ids.reduce((a,k)=>a+(s[k].available||0),0);
-const st=(l,v,t)=>mk('div',{className:'card stat'},mk('b',{textContent:v}),mk('span',{textContent:l}));
-const tag=(n,x)=>x?mk('span',{className:'tag '+(x.ok?'ok':'ko'),style:'margin-right:1rem',textContent:x.ok?`${n} · ${x.count} offres · ${x.available} dispo`:`${n} · ${x.error}`}):'';
-const v=$('view');
-v.append(mk('div',{className:'stats'},st('Offres suivies',tot),st('Dispo maintenant',av),st('Inscrits',subs),st('Dernier scan',s.lastRun?new Date(s.lastRun).toLocaleTimeString('fr-FR'):'—')),
-section('Fournisseurs',c.paused?'⏸ Alertes en pause : les scans continuent mais rien n\u2019est envoyé.':'Surveillance active, scan toutes les 5 minutes.',mk('div',{},...Object.keys(PN).map(k=>s[k]?.skipped?mk('span',{className:'meta',style:'margin-right:1rem',textContent:PN[k]+' · non configuré'}):tag(PN[k],s[k]))),s.mailError?mk('div',{className:'err',style:'margin-top:.6rem',textContent:'Dernière erreur mail : '+s.mailError}):'',
-mk('div',{className:'bar',style:'margin-top:1rem'},mk('button',{id:'chk',textContent:'Scanner maintenant',onclick:async e=>{e.target.disabled=true;note('n1','Scan en cours…',1);try{await api('/check',{});show('dash')}catch(x){note('n1',x.message);e.target.disabled=false}}}),
-mk('button',{className:'ghost',textContent:c.paused?'▶ Reprendre les alertes':'⏸ Mettre en pause',onclick:async()=>{await api('/config',{paused:!c.paused});show('dash')}})),mk('div',{id:'n1',className:'note'})));addChk()}
+const row=k=>{const x=s[k];if(!x||x.skipped)return mk('div',{className:'prow'},mk('span',{className:'dot off'}),mk('b',{textContent:PN[k]}),mk('span',{className:'meta',textContent:'non configuré'}));
+return mk('div',{className:'prow'},mk('span',{className:'dot '+(x.ok?(x.available?'ok':'idle'):'ko')}),mk('b',{textContent:PN[k]}),mk('span',{className:x.ok?'meta':'err',textContent:x.ok?`${x.count} offres · ${x.available} dispo`:x.error}))};
+const running=$('chk')?.disabled;
+top.replaceChildren(mk('div',{className:'stats'},stat('Offres suivies',tot),stat('Dispo maintenant',av),stat('Inscrits',subs),stat('Dernier scan',s.lastRun?ago(s.lastRun):'—')),
+section('Fournisseurs',c.paused?'⏸ Alertes en pause : les scans continuent mais rien n\u2019est envoyé.':'Surveillance active, scan toutes les 5 minutes. Cette vue se met à jour toute seule.',mk('div',{},...Object.keys(PN).map(row)),s.mailError?mk('div',{className:'err',style:'margin-top:.6rem',textContent:'Dernière erreur mail : '+s.mailError}):'',
+mk('div',{className:'bar',style:'margin-top:1rem'},mk('button',{id:'chk',disabled:running,textContent:running?'Scan en cours…':'Scanner maintenant',onclick:async e=>{e.target.disabled=true;e.target.textContent='Scan en cours…';try{await api('/check',{});toast('Scan terminé ✔')}catch(x){toast(x.message,0)}await paintDash()}}),
+mk('button',{className:'ghost',textContent:c.paused?'▶ Reprendre les alertes':'⏸ Mettre en pause',onclick:async()=>{await api('/config',{paused:!c.paused});toast(c.paused?'Alertes reprises ✔':'Alertes en pause ⏸');paintDash()}})),mk('div',{id:'n1',className:'note'})))}
 
 async function chk(s,id,value,mailFrom){note(id,'Vérification…',1);try{const r=await api('/verify',{service:s,value,mailFrom});note(id,(r.warn?'⚠ ':'✔ ')+r.detail,1)}catch(e){note(id,'✘ '+e.message)}}
 function addChk(){const out=mk('div',{id:'vl',style:'margin-top:1rem'});$('view').append(section('Vérification des clés','Teste en direct Brevo, Hetzner, Scaleway, Discord et OVH avec ce qui est enregistré.',mk('button',{textContent:'Tout vérifier',onclick:async e=>{e.target.disabled=true;out.replaceChildren();for(const [s,n] of [['brevo','Brevo'],['hetzner','Hetzner'],['scaleway','Scaleway'],['discord','Discord'],['ovh','OVH']]){let t,c;try{const r=await api('/verify',{service:s});t=(r.skip?'— ':r.warn?'⚠ ':'✔ ')+n+' : '+r.detail;c=r.skip?'meta':r.warn?'meta':'good'}catch(x){t='✘ '+n+' : '+x.message;c='err'}out.append(mk('div',{className:c,textContent:t,style:'padding:.25rem 0'}))}e.target.disabled=false}}),out))}
@@ -43,20 +51,29 @@ section('Scaleway (optionnel)','Clé secrète API Scaleway (lecture), nécessair
 section('Discord (optionnel)','Message direct dès qu\u2019une offre passe en dispo, sans passer par les mails.',field('discord','URL du webhook',1,ph(c.discord)),mk('button',{className:'ghost',style:'margin-top:.8rem',textContent:'Vérifier le webhook',onclick:()=>chk('discord','n6',$('discord').value)}),mk('div',{id:'n6',className:'note'})),
 section('Général','',field('publicUrl','URL publique du site (liens des mails)',0)),
 mk('div',{className:'bar'},mk('button',{textContent:'Enregistrer',onclick:async()=>{const b={mailFrom:$('mailFrom').value,replyTo:$('replyTo').value,mailName:$('mailName').value,publicUrl:$('publicUrl').value};for(const k of ['brevoKey','hcloud','scaleway','discord']){const x=$(k).value.trim();if(x==='-')b[k]=null;else if(x)b[k]=x}
-try{await api('/config',b);note('n2','Enregistré ✔',1);setTimeout(()=>show('cfg'),700)}catch(e){note('n2',e.message)}}}),mk('span',{className:'meta',textContent:'Champ secret vide = inchangé · tape « - » pour le supprimer'})),mk('div',{id:'n2',className:'note'}));
+try{await api('/config',b);toast('Réglages enregistrés ✔');show('cfg')}catch(e){note('n2',e.message)}}}),mk('span',{className:'meta',textContent:'Champ secret vide = inchangé · tape « - » pour le supprimer'})),mk('div',{id:'n2',className:'note'}));
 $('mailFrom').value=c.mailFrom;$('replyTo').value=c.replyTo;$('mailName').value=c.mailName;$('publicUrl').value=c.publicUrl}
 
 async function subs(){const l=await api('/subs');const v=$('view');
 if(!l.length)return v.append(mk('div',{className:'card',textContent:'Aucun inscrit pour le moment.'}));
+const ok=l.filter(x=>x.confirmed).length;let q='',f='all';
+const box=mk('div',{className:'card',style:'overflow-x:auto'});
+const draw=()=>{const r=l.filter(x=>(f==='all'||(f==='ok')===!!x.confirmed)&&x.email.toLowerCase().includes(q));
+if(!r.length)return box.replaceChildren(mk('div',{className:'meta',textContent:'Aucun résultat.'}));
 const t=mk('table',{},mk('tr',{},...['Email','Statut','Offres',''].map(x=>mk('th',{textContent:x}))));
-for(const s of l)t.append(mk('tr',{},mk('td',{textContent:s.email}),mk('td',{textContent:s.confirmed?'✔ confirmé':'en attente'}),mk('td',{textContent:s.offers}),mk('td',{},mk('button',{className:'red',textContent:'Supprimer',onclick:async()=>{if(confirm('Supprimer '+s.email+' ?')){await api('/subs/'+s.id,{});show('subs')}}}))));
-v.append(mk('div',{className:'card',style:'overflow-x:auto'},t))}
+for(const s of r)t.append(mk('tr',{},mk('td',{textContent:s.email}),mk('td',{className:s.confirmed?'good':'meta',textContent:s.confirmed?'✔ confirmé':'en attente'}),mk('td',{textContent:s.offers}),mk('td',{},mk('button',{className:'red',textContent:'Supprimer',onclick:async()=>{if(confirm('Supprimer '+s.email+' ?')){try{await api('/subs/'+s.id,{});toast('Inscrit supprimé');show('subs')}catch(e){toast(e.message,0)}}}}))));
+box.replaceChildren(t)};
+const exp=()=>{const csv='email;statut;offres\n'+l.map(x=>[x.email,x.confirmed?'confirme':'en attente',x.offers].join(';')).join('\n');const a=mk('a',{href:URL.createObjectURL(new Blob([csv],{type:'text/csv'})),download:'inscrits.csv'});document.body.append(a);a.click();a.remove()};
+v.append(mk('div',{className:'stats'},stat('Total',l.length),stat('Confirmés',ok),stat('En attente',l.length-ok)),
+mk('div',{className:'bar'},mk('input',{type:'text',placeholder:'Chercher un email…',style:'max-width:260px',oninput:e=>{q=e.target.value.trim().toLowerCase();draw()}}),chips([['all','Tous'],['ok','Confirmés'],['wait','En attente']],f,k=>{f=k;draw()}),mk('button',{className:'ghost',textContent:'⬇ Export CSV',onclick:exp})),box);draw()}
 
-async function logs(){const l=await api('/logs');const v=$('view');
+async function logs(){const l=await api('/logs');const v=$('view');let q='',f='all';
 const box=mk('div',{className:'card'});
-if(!l.length)box.textContent='Journal vide pour le moment.';
-for(const e of l)box.append(mk('div',{className:'lg'},mk('time',{textContent:fmt(e.t)}),mk('span',{className:'lv '+e.l,textContent:e.l}),mk('span',{textContent:e.m})));
-v.append(mk('div',{className:'bar'},mk('button',{className:'ghost',textContent:'↻ Actualiser',onclick:()=>show('logs')}),mk('button',{className:'ghost',textContent:'Vider',onclick:async()=>{if(confirm('Vider le journal ?')){await api('/logs/clear',{});show('logs')}}}),mk('span',{className:'meta',textContent:'200 derniers événements'})),box)}
+const draw=()=>{const r=l.filter(e=>(f==='all'||e.l===f)&&e.m.toLowerCase().includes(q));box.replaceChildren();
+if(!r.length)box.textContent=l.length?'Aucun événement pour ce filtre.':'Journal vide pour le moment.';
+for(const e of r)box.append(mk('div',{className:'lg'},mk('time',{textContent:fmt(e.t)}),mk('span',{className:'lv '+e.l,textContent:e.l}),mk('span',{textContent:e.m})))};
+v.append(mk('div',{className:'bar'},mk('button',{className:'ghost',textContent:'↻ Actualiser',onclick:()=>show('logs')}),mk('button',{className:'ghost',textContent:'Vider',onclick:async()=>{if(confirm('Vider le journal ?')){await api('/logs/clear',{});toast('Journal vidé');show('logs')}}}),mk('input',{type:'text',placeholder:'Filtrer…',style:'max-width:220px',oninput:e=>{q=e.target.value.trim().toLowerCase();draw()}}),mk('span',{className:'meta',textContent:'200 derniers événements'})),
+mk('div',{className:'bar'},chips([['all','Tous'],['error','Erreurs'],['warn','Alertes'],['ok','OK'],['info','Infos']],f,k=>{f=k;draw()})),box);draw()}
 
 function sec(){$('view').append(section('Mot de passe','10 caractères minimum.',mk('div',{className:'row2'},field('cur','Actuel',1),field('nxt','Nouveau',1)),mk('button',{style:'margin-top:1rem',textContent:'Changer',onclick:async()=>{try{await api('/password',{current:$('cur').value,next:$('nxt').value});note('n4','Mot de passe changé ✔',1)}catch(e){note('n4',e.message)}}}),mk('div',{id:'n4',className:'note'})),
 section('Session','Tu restes connecté 7 jours.',mk('button',{className:'ghost',textContent:'Déconnexion',onclick:async()=>{await api('/logout',{});boot()}})))}
