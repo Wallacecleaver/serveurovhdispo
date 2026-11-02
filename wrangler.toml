@@ -5,10 +5,20 @@ compatibility_date = "2025-01-01"
 [assets]
 directory = "./public"
 
+# Base D1 : inscrits, etat du scan, journal, sessions (gratuit : 100 000 ecritures/jour)
+# Cree la base avec : npx wrangler d1 create serveurovhdispo
+# puis colle le database_id ici. Les tables se creent toutes seules au premier lancement,
+# et les anciens inscrits du KV sont repris automatiquement.
+[[d1_databases]]
+binding = "DB"
+database_name = "serveurovhdispo"
+database_id = "REMPLACE_PAR_L_ID_DE_LA_BASE_D1"
+
 # Verification toutes les 5 minutes
 [triggers]
 crons = ["*/5 * * * *"]
 
+# KV : uniquement les reglages et l'acces admin (peu d'ecritures)
 # Cree le KV avec : npx wrangler kv namespace create KV
 # puis colle l'id ici
 [[kv_namespaces]]
