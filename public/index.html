@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&display=swap">
-<link rel="stylesheet" href="/site.css?v=7">
+<link rel="stylesheet" href="/site.css?v=8">
 </head>
 <body>
 <main class="wrap">
@@ -58,7 +58,7 @@
 
   <footer class="foot">
     <p>Les stocks sont indicatifs : un serveur affiché dispo peut être pris avant ta commande.</p>
-    <p class="credit">Fait avec <span class="hrt">&hearts;</span> par <b class="who">Wallace</b> &middot; <a href="#conditions" id="fc">Conditions générales</a></p>
+    <p class="credit">Fait avec <span class="hrt">&hearts;</span> par <b class="who">Wallace</b> &middot; <a href="#conditions" id="fc">Conditions et confidentialité</a></p>
   </footer>
 </main>
 
@@ -68,7 +68,7 @@
       <div class="hd"><h2 id="ht">Aide</h2><button type="button" class="x" id="hx" aria-label="Fermer l'aide">✕</button></div>
       <div class="tabs" role="tablist">
         <button type="button" role="tab" id="t-how" aria-selected="true" aria-controls="p-how">Comment ça marche</button>
-        <button type="button" role="tab" id="t-cgu" aria-selected="false" aria-controls="p-cgu">Conditions générales</button>
+        <button type="button" role="tab" id="t-cgu" aria-selected="false" aria-controls="p-cgu">Conditions et confidentialité</button>
       </div>
     </div>
     <div id="p-how" class="how" role="tabpanel" aria-labelledby="t-how">
@@ -78,7 +78,7 @@
       <details><summary>Je coche une offre déjà dispo, que se passe-t-il ?</summary><p>Tu reçois un mail tout de suite pour te dire qu'elle est disponible, puis de nouveau si elle repasse indispo et revient.</p></details>
       <details><summary>Comment modifier mes serveurs ?</summary><p>Clique sur « Gérer mon alerte » en haut de la page et entre ton adresse mail : tu reçois un lien personnel (sans mot de passe) pour changer ta sélection ou supprimer ton alerte.</p></details>
       <details><summary>Comment me désinscrire ?</summary><p>Chaque mail contient un lien de désinscription. Un clic suffit, ton adresse est supprimée.</p></details>
-      <details><summary>Que faites-vous de mon adresse mail ?</summary><p>Elle sert uniquement à t'envoyer ces alertes. Tu dois d'abord confirmer ton adresse avec un lien reçu par mail. Le détail est dans l'onglet « Conditions générales ».</p></details>
+      <details><summary>Que faites-vous de mon adresse mail ?</summary><p>Elle sert uniquement à t'envoyer ces alertes. Tu dois d'abord confirmer ton adresse avec un lien reçu par mail. Le détail est dans l'onglet « Conditions et confidentialité ».</p></details>
     </div>
     <div id="p-cgu" class="cgu" role="tabpanel" aria-labelledby="t-cgu" hidden><div class="empty">Chargement…</div></div>
   </div>
@@ -90,6 +90,7 @@
     <input type="email" id="email" placeholder="ton@email.fr" required autocomplete="email" aria-label="Ton adresse mail">
     <button class="cta" id="btn">Activer l'alerte</button>
     <p class="hint" id="hint"></p>
+    <p class="hint">En activant l'alerte, tu acceptes les <a href="#conditions" id="fc2">conditions et la politique de confidentialité</a>.</p>
     <p id="msg" role="status"></p>
   </form>
 </div>
@@ -210,7 +211,7 @@ const openHelp=(t='how')=>{tab(t);if(!hd.open)hd.showModal();store.set('helpSeen
 hd.addEventListener('close',()=>{if(/^#(aide|conditions)$/.test(location.hash))history.replaceState(null,'',location.pathname+location.search)});
 $('hb').onclick=()=>{history.replaceState(null,'','#aide');openHelp()};
 $('hx').onclick=()=>hd.close();
-$('fc').onclick=e=>{e.preventDefault();history.replaceState(null,'','#conditions');openHelp('cgu')};
+$('fc').onclick=$('fc2').onclick=e=>{e.preventDefault();history.replaceState(null,'','#conditions');openHelp('cgu')};
 $('t-how').onclick=()=>tab('how');$('t-cgu').onclick=()=>tab('cgu');
 hd.addEventListener('click',e=>{if(e.target===hd)hd.close()});
 if(!store.get('helpSeen',0))$('hb').classList.add('new');

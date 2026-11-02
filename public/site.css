@@ -128,7 +128,7 @@ details p{margin:.5rem 0 0;color:var(--mut)}
 .legal h1{font-size:clamp(2rem,6vw,3rem)}
 .legal h2{font:700 1.15rem var(--head);margin:2rem 0 .4rem;color:var(--fg)}
 .legal p{color:#b9bfe6;margin:0 0 .8rem}
-.legal .lede{margin:.4rem 0 1rem}
+.legal h3{font:700 .8rem ui-monospace,monospace;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);margin:1.3rem 0 .4rem}.legal ul,#p-cgu ul{color:#b9bfe6;margin:0 0 .8rem;padding-left:1.2rem}.legal li,#p-cgu li{margin:.3rem 0}.legal a,#p-cgu a{color:var(--fg)}.legal .lede{margin:.4rem 0 1rem}
 .legal .credit{margin-top:3rem;padding-top:1.2rem;border-top:1px solid var(--line)}
 
 /* navigation du haut : actions regroupees dans une seule pastille */
