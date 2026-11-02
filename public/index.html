@@ -3,12 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="author" content="Wallace">
 <title>Radar serveurs : alerte dès qu'un serveur est en stock</title>
 <meta name="description" content="Coche les serveurs (VPS) qui t'intéressent et reçois un mail dès qu'ils sont de nouveau en stock.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;700;800&display=swap">
-<link rel="stylesheet" href="/site.css?v=4">
+<link rel="stylesheet" href="/site.css?v=5">
 </head>
 <body>
 <main class="wrap">
@@ -16,6 +17,7 @@
   <header class="hero">
     <div>
       <h1>Radar serveurs</h1>
+      <p class="by">par <a href="https://github.com/Wallacecleaver" target="_blank" rel="noopener">Wallace</a></p>
       <p class="lede">Coche les serveurs qui t'intéressent. Dès que l'un d'eux revient en stock en Europe, tu reçois un mail.</p>
       <p class="scan" id="scan">Scan en cours…</p>
     </div>
@@ -50,7 +52,10 @@
     <div class="list" id="list" aria-live="polite"><div class="empty">Chargement des offres…</div></div>
   </section>
 
-  <footer>Les stocks sont indicatifs : un serveur affiché dispo peut être pris avant ta commande.</footer>
+  <footer class="foot">
+    <p>Les stocks sont indicatifs : un serveur affiché dispo peut être pris avant ta commande.</p>
+    <p class="credit">Fait avec <span class="hrt">&hearts;</span> par <a href="https://github.com/Wallacecleaver" target="_blank" rel="noopener">Wallace</a> &middot; <a href="/conditions">Conditions d'utilisation</a> &middot; <a href="#aide" id="fh">Aide</a></p>
+  </footer>
 </main>
 
 <dialog id="help" aria-labelledby="ht">
@@ -177,6 +182,7 @@ const openHelp=()=>{if(!hd.open)hd.showModal();store.set('helpSeen',1);$('hb').c
 hd.addEventListener('close',()=>{if(location.hash==='#aide')history.replaceState(null,'',location.pathname+location.search)});
 $('hb').onclick=()=>{history.replaceState(null,'','#aide');openHelp()};
 $('hx').onclick=()=>hd.close();
+$('fh').onclick=e=>{e.preventDefault();history.replaceState(null,'','#aide');openHelp()};
 hd.addEventListener('click',e=>{if(e.target===hd)hd.close()});
 if(!store.get('helpSeen',0))$('hb').classList.add('new');
 if(location.hash==='#aide')openHelp();

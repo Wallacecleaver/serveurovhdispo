@@ -94,7 +94,7 @@ details p{margin:.5rem 0 0;color:var(--mut)}
 .steps{list-style:none;margin:0 0 1.4rem;padding:0;display:grid;grid-template-columns:repeat(3,1fr);gap:.7rem}
 .steps li{display:flex;gap:.7rem;align-items:center;padding:.8rem .9rem;background:var(--panel);border:1px solid var(--line);border-radius:12px;font-size:.93rem}
 .steps b{flex:none;display:grid;place-items:center;width:28px;height:28px;border-radius:50%;color:#04121a;background:linear-gradient(135deg,var(--cy),var(--vi));font:800 .9rem var(--head)}
-footer{margin-top:2.5rem;color:var(--mut);font-size:.85rem}
+
 
 @media(max-width:760px){
   .steps{grid-template-columns:1fr}
@@ -104,3 +104,29 @@ footer{margin-top:2.5rem;color:var(--mut);font-size:.85rem}
   .row input{grid-area:c;align-self:start;margin-top:.2rem}
   .row .main{grid-area:n}.row .price{grid-area:p}.row .state{grid-area:s}.row .go{grid-area:g;justify-self:start}
 }
+
+/* ---- crédit / pied de page ---- */
+.by{margin:-.4rem 0 .9rem;color:var(--mut);font-size:.95rem}
+.by a{color:var(--cy);font-weight:700;text-decoration:none}.by a:hover{text-decoration:underline}
+.foot{margin-top:2.5rem;padding-top:1.2rem;border-top:1px solid var(--line);color:var(--mut);font-size:.85rem}
+.foot p{margin:0 0 .4rem}
+.credit{color:var(--mut);font-size:.88rem}
+.credit a{color:var(--mut);text-underline-offset:3px}.credit a:hover{color:var(--fg)}
+.credit a[href*="github"]{color:var(--cy);font-weight:700;text-decoration:none}
+.hrt{color:var(--ko)}
+
+/* ---- pages de message et conditions ---- */
+.msgpage{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:90vh;text-align:center}
+.msgcard{width:min(460px,100%);padding:2.2rem 1.6rem;background:var(--panel);border:1px solid var(--line);border-top:3px solid var(--vi);border-radius:18px}
+.msgcard .ic{display:grid;place-items:center;width:64px;height:64px;margin:0 auto 1rem;border-radius:50%;font-size:1.9rem;font-weight:800;color:#04121a;background:var(--ok);box-shadow:0 0 0 8px rgba(61,255,168,.12)}
+.msgcard .ic.ko{background:var(--ko);box-shadow:0 0 0 8px rgba(255,107,134,.12)}
+.msgcard h1{font-size:1.8rem;margin:0 0 .6rem}.msgcard p{margin:0 0 1.4rem;color:var(--mut)}
+.msgcard .cta{display:inline-block;text-decoration:none}
+.msgpage .credit{margin-top:1.4rem}
+.legal{max-width:760px;padding-bottom:3rem}
+.legal .back{display:inline-block;margin:1.4rem 0 .6rem;color:var(--mut);text-decoration:none}.legal .back:hover{color:var(--fg)}
+.legal h1{font-size:clamp(2rem,6vw,3rem)}
+.legal h2{font:700 1.15rem var(--head);margin:2rem 0 .4rem;color:var(--fg)}
+.legal p{color:#b9bfe6;margin:0 0 .8rem}
+.legal .lede{margin:.4rem 0 1rem}
+.legal .credit{margin-top:3rem;padding-top:1.2rem;border-top:1px solid var(--line)}

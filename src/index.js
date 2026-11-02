@@ -1,7 +1,7 @@
 import { fetchOvh } from './ovh.js';
 import { fetchHetzner } from './hetzner.js';
 import { fetchScaleway } from './scaleway.js';
-import { sendMail, esc, confirmMail, alertMail, testMail } from './mail.js';
+import { sendMail, esc, confirmMail, confirmText, alertMail, alertText, testMail, testText } from './mail.js';
 
 // Fournisseurs surveilles. `needs` = champ de config requis (sinon le fournisseur est ignore).
 const PROVIDERS = [
@@ -12,7 +12,7 @@ const PROVIDERS = [
 const ORDER = Object.fromEntries(PROVIDERS.map((p) => [p.id, p.order]));
 const PNAME = Object.fromEntries(PROVIDERS.map((p) => [p.id, p.name]));
 const json = (d, s = 200, h = {}) => new Response(JSON.stringify(d), { status: s, headers: { 'content-type': 'application/json', ...h } });
-const html = (msg) => new Response(`<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width"><link rel="stylesheet" href="/style.css"><body><main class="wrap"><div class="card"><p>${esc(msg)}</p><a href="/">← Retour</a></div></main>`, { headers: { 'content-type': 'text/html; charset=utf-8' } });
+const html = (title, msg, ok = true) => new Response(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${esc(title)} · Radar serveurs</title><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@700;800&display=swap"><link rel="stylesheet" href="/site.css?v=5"></head><body><main class="wrap msgpage"><div class="msgcard"><div class="ic${ok ? '' : ' ko'}">${ok ? '✓' : '!'}</div><h1>${esc(title)}</h1><p>${esc(msg)}</p><a class="cta" href="/">Retour au radar</a></div><footer class="credit">Fait avec <span class="hrt">♥</span> par <a href="https://github.com/Wallacecleaver" target="_blank" rel="noopener">Wallace</a> · <a href="/conditions">Conditions d'utilisation</a></footer></main></body></html>`, { status: ok ? 200 : 404, headers: { 'content-type': 'text/html; charset=utf-8' } });
 
 // ---------- config (KV d'abord, variables d'env en secours) ----------
 const rawCfg = async (env) => (await env.KV.get('config', 'json')) || {};
@@ -113,8 +113,9 @@ async function runCheck(env, manual = false) {
     }
     if (!hits.length) continue;
     try {
-      const html = alertMail({ hits: hits.map((o) => ({ ...o, order: ORDER[o.provider], providerName: PNAME[o.provider] })), unsubUrl: `${cfg.publicUrl}/unsubscribe/${sub.id}`, siteUrl: cfg.publicUrl });
-      await sendMail(cfg, { to: sub.email, subject: `🚀 Serveur dispo : ${hits.map((h) => h.label.split(' - ')[0]).join(', ')}`, html });
+      const html = alertMail({ hits: hits.map((o) => ({ ...o, order: ORDER[o.provider], providerName: PNAME[o.provider] })), unsubUrl: `${cfg.publicUrl}/unsubscribe/${sub.id}`, publicUrl: cfg.publicUrl });
+      const text = alertText({ hits: hits.map((o) => ({ ...o, order: ORDER[o.provider], providerName: PNAME[o.provider] })), unsubUrl: `${cfg.publicUrl}/unsubscribe/${sub.id}`, publicUrl: cfg.publicUrl });
+      await sendMail(cfg, { to: sub.email, subject: `🚀 Serveur dispo : ${hits.map((h) => h.label.split(' - ')[0]).join(', ')}`, html, text });
       hits.forEach((h) => (sub.notified[h.key] = true));
       changed = true;
       await log(env, 'ok', `Alerte envoyée à ${sub.email} (${hits.length} offre(s))`);
@@ -145,7 +146,7 @@ async function subscribe(request, env, cfg) {
   }
   sub.offers = wanted; sub.notified = {};
   try {
-    await sendMail(cfg, { to: email, subject: '✅ Confirme ton alerte serveur', html: confirmMail({ url: `${cfg.publicUrl}/confirm/${sub.id}`, names: wanted.map((k) => labelOf[k] || k), siteUrl: cfg.publicUrl }) });
+    await sendMail(cfg, { to: email, subject: '✅ Confirme ton alerte serveur', html: confirmMail({ url: `${cfg.publicUrl}/confirm/${sub.id}`, names: wanted.map((k) => labelOf[k] || k), publicUrl: cfg.publicUrl }), text: confirmText({ url: `${cfg.publicUrl}/confirm/${sub.id}`, names: wanted.map((k) => labelOf[k] || k), publicUrl: cfg.publicUrl }) });
   } catch (e) { return json({ error: "Envoi du mail impossible (l'admin doit configurer Brevo)" }, 502); }
   await putSubs(env, subs);
   await log(env, 'info', `Inscription en attente : ${email}`);
@@ -199,7 +200,7 @@ async function admin(request, env, path) {
   if (path === '/status') return json({ status: (await env.KV.get('status', 'json')) || {}, subs: (await getSubs(env)).length });
   if (path === '/check' && request.method === 'POST') { await log(env, 'info', 'Scan manuel lancé'); return json(await runCheck(env, true)); }
   if (path === '/test-mail' && request.method === 'POST') {
-    try { await sendMail(await getCfg(env), { to: String(body.to || ''), subject: 'Test alertes serveurs', html: testMail() }); await log(env, 'ok', 'Mail de test envoyé à ' + body.to); return json({ ok: true }); }
+    try { await sendMail(await getCfg(env), { to: String(body.to || ''), subject: 'Test alertes serveurs', html: testMail({ publicUrl: (await getCfg(env)).publicUrl }), text: testText() }); await log(env, 'ok', 'Mail de test envoyé à ' + body.to); return json({ ok: true }); }
     catch (e) { await log(env, 'error', 'Test mail : ' + e.message); return json({ error: e.message }, 502); }
   }
   if (path === '/subs' && request.method === 'GET') return json((await getSubs(env)).map(({ id, email, confirmed, offers }) => ({ id, email, confirmed, offers: offers.length, keys: offers })));
@@ -286,11 +287,11 @@ export default {
     const m = p.match(/^\/(confirm|unsubscribe)\/([0-9a-f-]{36})$/);
     if (m) {
       const subs = await getSubs(env), sub = subs.find((s) => s.id === m[2]);
-      if (!sub) return html('Lien invalide ou déjà utilisé.');
-      if (m[1] === 'confirm') { sub.confirmed = true; await putSubs(env, subs); await log(env, 'ok', `Email confirmé : ${sub.email}`); return html('Email confirmé : tu recevras un mail dès qu\'un serveur est dispo.'); }
+      if (!sub) return html('Lien invalide', 'Ce lien est invalide ou a déjà été utilisé.', false);
+      if (m[1] === 'confirm') { sub.confirmed = true; await putSubs(env, subs); await log(env, 'ok', `Email confirmé : ${sub.email}`); return html('Adresse confirmée', 'Tes alertes sont activées : tu recevras un mail dès qu\'un des serveurs choisis est de retour en stock.'); }
       await putSubs(env, subs.filter((s) => s.id !== sub.id));
       await log(env, 'info', `Désinscription : ${sub.email}`);
-      return html('Tu es désinscrit.');
+      return html('Tu es désinscrit', 'Ton adresse a été supprimée, tu ne recevras plus aucun mail. Tu peux te réinscrire à tout moment.');
     }
     return new Response('Not found', { status: 404 });
   },
