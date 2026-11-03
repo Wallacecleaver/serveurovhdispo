@@ -42,6 +42,7 @@
   <ul>
     <li>Ton <b>adresse mail</b>, la <b>liste des offres</b> que tu as choisies et l'<b>état de tes alertes</b> (par exemple : alerte déjà envoyée, pour ne pas t'écrire en double).</li>
     <li>Des <b>données techniques</b> : ton adresse IP, utilisée quelques minutes à quelques heures pour limiter les abus (nombre d'inscriptions ou de tentatives de connexion) et traitée par Cloudflare pour acheminer et sécuriser les pages.</li>
+    <li>Un <b>compteur de visiteurs</b> : pour savoir combien de personnes différentes consultent le site, une <b>empreinte</b> de ton adresse IP (calculée avec une clé secrète, l'adresse elle-même n'est pas conservée) est enregistrée, sans cookie ni suivi sur d'autres sites. Cette empreinte reste une donnée technique, et elle ne sert qu'à compter les visiteurs.</li>
     <li>Un <b>journal de fonctionnement</b> réservé à l'éditeur : il garde les 200 derniers événements (inscription, confirmation, modification ou suppression d'une alerte, erreurs). Il peut contenir ton adresse mail.</li>
   </ul>
   <p>Aucune autre donnée n'est demandée : pas de nom, pas de compte, pas de mot de passe côté visiteur.</p>
@@ -54,6 +55,7 @@
     <li>Adresse non confirmée : supprimée automatiquement au bout de <b>7 jours</b>.</li>
     <li>Adresse confirmée et offres choisies : conservées <b>jusqu'à ce que tu te désinscrives</b> (lien en bas de chaque mail, ou page « Gérer mon alerte »). La suppression est immédiate et définitive.</li>
     <li>Données techniques anti-abus (IP) : de 15 minutes à 1 heure.</li>
+    <li>Empreinte du compteur de visiteurs : <b>13 mois</b> au maximum, puis supprimée.</li>
     <li>Journal de fonctionnement : les 200 derniers événements seulement, les plus anciens sont effacés au fur et à mesure.</li>
   </ul>
 

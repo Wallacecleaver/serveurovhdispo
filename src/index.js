@@ -24,7 +24,7 @@ const mask = (v) => (v ? '••••' + v.slice(-4) : '');
 
 // ---------- base D1 : inscrits, état du scan, journal, sessions, jetons ----------
 // Le KV gratuit n'autorise que 1 000 écritures par jour : tout ce qui change souvent vit dans D1 (100 000 par jour).
-const SCHEMA_V = '1';
+const SCHEMA_V = '2';
 const SCHEMA = [
   'CREATE TABLE IF NOT EXISTS subs (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, confirmed INTEGER NOT NULL DEFAULT 0, created INTEGER NOT NULL)',
   'CREATE TABLE IF NOT EXISTS sub_offers (sub_id TEXT NOT NULL, offer_key TEXT NOT NULL, notified INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (sub_id, offer_key))',
@@ -34,6 +34,8 @@ const SCHEMA = [
   'CREATE TABLE IF NOT EXISTS logs (id INTEGER PRIMARY KEY AUTOINCREMENT, t INTEGER NOT NULL, l TEXT NOT NULL, m TEXT NOT NULL)',
   'CREATE TABLE IF NOT EXISTS tmp (k TEXT PRIMARY KEY, v TEXT NOT NULL, exp INTEGER NOT NULL)',
   'CREATE INDEX IF NOT EXISTS idx_tmp_exp ON tmp(exp)',
+  'CREATE TABLE IF NOT EXISTS visits (h TEXT PRIMARY KEY, first INTEGER NOT NULL, last INTEGER NOT NULL)',
+  'CREATE INDEX IF NOT EXISTS idx_visits_last ON visits(last)',
 ];
 let ready = null;
 function db(env) {
@@ -137,8 +139,33 @@ async function cleanup(env) {
     await d.batch([
       d.prepare('DELETE FROM sub_offers WHERE sub_id IN (SELECT id FROM subs WHERE confirmed = 0 AND created < ?)').bind(cut),
       d.prepare('DELETE FROM subs WHERE confirmed = 0 AND created < ?').bind(cut),
+      d.prepare('DELETE FROM visits WHERE last < ?').bind(t - 400 * 86400000),
     ]);
   }
+}
+
+// ---------- compteur de visiteurs uniques ----------
+// On ne stocke jamais l'IP : seulement une empreinte salée (SHA-256 tronquée). Une IP différente = un visiteur de plus.
+const BOT_UA = /bot|crawl|spider|slurp|preview|facebookexternalhit|discord|slack|telegram|whatsapp|curl|wget|headless|lighthouse|monitor|uptime|python|node-fetch|axios|go-http/i;
+async function visit(request, env) {
+  const ok = json({ ok: true });
+  const ua = request.headers.get('user-agent') || '', ip = request.headers.get('cf-connecting-ip') || '';
+  if (!ip || !ua || BOT_UA.test(ua)) return ok;
+  const d = await db(env), t = Date.now();
+  await d.prepare("INSERT INTO state(k, v) VALUES('visitSalt', ?) ON CONFLICT(k) DO NOTHING").bind(JSON.stringify(crypto.randomUUID() + crypto.randomUUID())).run();
+  const salt = await sget(env, 'visitSalt', '');
+  const h = hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(salt + '|' + ip))).slice(0, 32);
+  const row = await d.prepare('SELECT last FROM visits WHERE h = ?').bind(h).first();
+  if (row && row.last > t - 3600000) return ok; // déjà compté il y a moins d'une heure : aucune écriture
+  if (await limited(env, 'rl:visit:' + ip, 20, 900)) return ok;
+  if (row) await d.prepare('UPDATE visits SET last = ? WHERE h = ?').bind(t, h).run();
+  else await d.prepare('INSERT OR IGNORE INTO visits(h, first, last) VALUES(?, ?, ?)').bind(h, t, t).run();
+  return ok;
+}
+async function countVisits(env) {
+  const t = Date.now();
+  const r = await (await db(env)).prepare('SELECT COUNT(*) AS total, SUM(last >= ?) AS d1, SUM(last >= ?) AS d7 FROM visits').bind(t - 86400000, t - 7 * 86400000).first();
+  return { total: r?.total || 0, d1: r?.d1 || 0, d7: r?.d7 || 0 };
 }
 
 // ---------- auth ----------
@@ -413,7 +440,7 @@ async function admin(request, env, path) {
     ]);
     return json({ services: [{ id: 'brevo', name: 'API Brevo', ...brevo }, { id: 'd1', name: 'Base D1', ...d1 }, { id: 'kv', name: 'KV', ...kv }], t: Date.now() });
   }
-  if (path === '/status') return json({ status: await getStatus(env), subs: await countSubs(env) });
+  if (path === '/status') return json({ status: await getStatus(env), subs: await countSubs(env), visits: await countVisits(env) });
   if (path === '/check' && request.method === 'POST') { await log(env, 'info', 'Scan manuel lancé'); return json(await runCheck(env, true)); }
   if (path === '/test-mail' && request.method === 'POST') {
     try { await sendMail(await getCfg(env), { to: String(body.to || ''), subject: 'Test alertes serveurs', html: testMail({ publicUrl: (await getCfg(env)).publicUrl }), text: testText() }); await log(env, 'ok', 'Mail de test envoyé à ' + body.to); return json({ ok: true }); }
@@ -492,6 +519,7 @@ async function admin(request, env, path) {
 async function route(request, env, ctx) {
   const url = new URL(request.url), p = url.pathname;
   if (p.startsWith('/api/admin/')) return admin(request, env, p.slice(10));
+  if (p === '/api/visit' && request.method === 'POST') return visit(request, env);
   const cfg = await getCfg(env);
   if (!cfg.publicUrl) { const c = await rawCfg(env); c.publicUrl = url.origin; await env.KV.put('config', JSON.stringify(c)); cfg.publicUrl = url.origin; }
   if (p.startsWith('/api/manage/')) return manage(request, env, cfg, p.slice(11), ctx);

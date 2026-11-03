@@ -164,6 +164,7 @@ function syncChips(){
 function tick(){$('scan').textContent=lastRun?'Dernier scan '+ago(lastRun)+', mis à jour toutes les 5 minutes.':'Premier scan en cours…'}
 
 async function load(){
+  try{if(!sessionStorage.getItem('v')){sessionStorage.setItem('v','1');fetch('/api/visit',{method:'POST',keepalive:true}).catch(()=>{})}}catch(e){}
   try{
     const d=await (await fetch('/api/offers')).json();
     all=d.offers||[];provs=d.providers||[];lastRun=d.lastRun;loaded=true;
