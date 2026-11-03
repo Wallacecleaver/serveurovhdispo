@@ -1,4 +1,4 @@
-<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><meta name="author" content="Wallace"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta name="theme-color" content="#05060f"><title>Admin · Radar serveurs</title><link rel="stylesheet" href="/style.css?v=7"></head>
+<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><meta name="author" content="Wallace"><link rel="icon" href="/favicon.svg" type="image/svg+xml"><link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta name="theme-color" content="#05060f"><title>Admin · Radar serveurs</title><link rel="stylesheet" href="/style.css?v=8"></head>
 <body><main class="wrap" style="max-width:1100px"><div id="app"></div></main>
 <script>
 const $=id=>document.getElementById(id);
@@ -14,9 +14,9 @@ let cur='dash',timer;
 const field=(id,label,secret,ph)=>mk('div',{},mk('label',{className:'f',htmlFor:id,textContent:label}),secret?mk('div',{className:'fw'},mk('input',{id,type:'password',autocomplete:'new-password',placeholder:ph||''}),mk('button',{type:'button',className:'ghost eye',textContent:'Voir',onclick:e=>{const i=$(id);const v=i.type==='password';i.type=v?'text':'password';e.target.textContent=v?'Cacher':'Voir'}})):mk('input',{id,type:'text',autocomplete:'off',placeholder:ph||''}));
 const section=(title,desc,...k)=>mk('div',{className:'card sec'},mk('h3',{textContent:title}),mk('p',{textContent:desc}),...k);
 
-async function boot(){const s=await api('/state');s.authed?shell():gate(s.setup)}
-function gate(setup){const a=$('app');a.replaceChildren(mk('h1',{textContent:'CONSOLE ADMIN'}),mk('p',{className:'sub',textContent:'Connexion'}),
-mk('div',{className:'card',style:'max-width:420px'},mk('input',{id:'pw',type:'password',autocomplete:'current-password',placeholder:'Mot de passe'}),mk('div',{className:'bar',style:'margin-top:.8rem'},mk('button',{id:'go',textContent:'Entrer'}),mk('button',{type:'button',className:'ghost',id:'eye',textContent:'Voir'})),mk('div',{id:'m',className:'note'})),credit());
+async function boot(){const s=await api('/state');s.authed?shell():gate(s)}
+function gate(st){const a=$('app');a.replaceChildren(mk('div',{className:'brandrow'},mk('img',{className:'brand',src:'/logo.svg',width:48,height:48,alt:'Logo Radar serveurs'}),mk('h1',{textContent:'Console admin',style:'margin:0'})),mk('p',{className:'sub',textContent:'Connexion'}),
+mk('div',{className:'card',style:'max-width:420px'},mk('input',{id:'pw',type:'password',autocomplete:'current-password',placeholder:'Mot de passe'}),mk('div',{className:'bar',style:'margin-top:.8rem'},mk('button',{id:'go',textContent:'Entrer'}),mk('button',{type:'button',className:'ghost',id:'eye',textContent:'Voir'})),mk('div',{id:'m',className:'note'}),st.configured?'':mk('div',{className:'note err',textContent:'ADMIN_PASSWORD est absent de la configuration : ajoute-le (wrangler.toml ou npx wrangler secret put ADMIN_PASSWORD), puis relance npx wrangler deploy.'})),credit());
 const go=async()=>{try{await api('/login',{password:$('pw').value});boot()}catch(e){note('m',e.message)}};
 $('pw').focus();$('go').onclick=go;$('eye').onclick=()=>{const i=$('pw');const v=i.type==='password';i.type=v?'text':'password';$('eye').textContent=v?'Cacher':'Voir';i.focus()};$('pw').onkeydown=e=>e.key==='Enter'&&go()}
 
@@ -30,12 +30,13 @@ function show(v){clearInterval(timer);document.onkeydown=null;cur=v;history.repl
 
 async function dash(){$('view').append(mk('div',{id:'top'}));await paintDash();addChk();
 timer=setInterval(()=>{if(cur==='dash'&&!document.hidden&&!$('chk')?.disabled)paintDash().catch(()=>{})},30000)}
-async function paintDash(){const [{status:s,subs},c,lg,hl]=await Promise.all([api('/status'),api('/config'),api('/logs'),api('/health').catch(e=>({services:[],err:e.message}))]);const top=$('top');if(!top)return;
+async function paintDash(){const [{status:s,subs},c,lg,hl,st]=await Promise.all([api('/status'),api('/config'),api('/logs'),api('/health').catch(e=>({services:[],err:e.message})),api('/state').catch(()=>({}))]);const top=$('top');if(!top)return;
+const warn=[];if(st.weak)warn.push('🔑 Mot de passe admin trop court ou par défaut : change-le (voir l’onglet Sécurité).');const pu=String(c.publicUrl||'');if(!/^https:\/\//.test(pu)||/TON-SOUS-DOMAINE|localhost/i.test(pu))warn.push('🔗 URL publique du site non configurée : les liens des mails (confirmation, gestion, désinscription) seraient cassés. Renseigne-la dans Réglages › Général.');
 const PN={ovh:'OVH VPS',hetzner:'Hetzner',scaleway:'Scaleway'};const ids=Object.keys(PN).filter(k=>s[k]&&!s[k].skipped);const tot=ids.reduce((a,k)=>a+(s[k].count||0),0),av=ids.reduce((a,k)=>a+(s[k].available||0),0);
 const row=k=>{const x=s[k];if(!x||x.skipped)return mk('div',{className:'prow'},mk('span',{className:'dot off'}),mk('b',{textContent:PN[k]}),mk('span',{className:'meta',textContent:'non configuré'}));
 return mk('div',{className:'prow'},mk('span',{className:'dot '+(x.ok?(x.available?'ok':'idle'):'ko')}),mk('b',{textContent:PN[k]}),mk('span',{className:x.ok?'meta':'err',textContent:x.ok?`${x.count} offres · ${x.available} dispo`:x.error}))};
 const running=$('chk')?.disabled;
-top.replaceChildren(mk('div',{className:'stats'},stat('Offres suivies',tot),stat('Dispo maintenant',av),stat('Inscrits',subs),stat('Dernier scan',s.lastRun?ago(s.lastRun):'—')),
+top.replaceChildren(...warn.map(w=>mk('div',{className:'card err',style:'margin-bottom:1rem',textContent:w})),mk('div',{className:'stats'},stat('Offres suivies',tot),stat('Dispo maintenant',av),stat('Inscrits',subs),stat('Dernier scan',s.lastRun?ago(s.lastRun):'—')),
 section('État des services',hl.err?hl.err:'Vérifié à chaque ouverture de la vue d\u2019ensemble (et toutes les 30 s).',mk('div',{},...hl.services.map(x=>mk('div',{className:'prow'},mk('span',{className:'dot '+x.state}),mk('b',{textContent:x.name}),mk('span',{className:x.state==='ko'?'err':'meta',textContent:x.detail+' · '+x.ms+' ms'}))))),
 section('Fournisseurs',c.paused?'⏸ Alertes en pause : les scans continuent mais rien n\u2019est envoyé.':'Surveillance active, scan toutes les 5 minutes. Cette vue se met à jour toute seule.',mk('div',{},...Object.keys(PN).map(row)),s.mailError?mk('div',{className:'err',style:'margin-top:.6rem',textContent:'Dernière erreur mail : '+s.mailError}):'',
 mk('div',{className:'bar',style:'margin-top:1rem'},mk('button',{id:'chk',disabled:running,textContent:running?'Scan en cours…':'Scanner maintenant',onclick:async e=>{e.target.disabled=true;e.target.textContent='Scan en cours…';try{await api('/check',{});toast('Scan terminé ✔')}catch(x){toast(x.message,0)}await paintDash()}}),
@@ -78,7 +79,11 @@ for(const e of r)box.append(mk('div',{className:'lg'},mk('time',{textContent:fmt
 v.append(mk('div',{className:'bar'},mk('button',{className:'ghost',textContent:'↻ Actualiser',onclick:()=>show('logs')}),mk('button',{className:'ghost',textContent:'Vider',onclick:async()=>{if(confirm('Vider le journal ?')){await api('/logs/clear',{});toast('Journal vidé');show('logs')}}}),mk('input',{type:'text',placeholder:'Filtrer…',style:'max-width:220px',oninput:e=>{q=e.target.value.trim().toLowerCase();draw()}}),mk('span',{className:'meta',textContent:'200 derniers événements'})),
 mk('div',{className:'bar'},chips([['all','Tous'],['error','Erreurs'],['warn','Alertes'],['ok','OK'],['info','Infos']],f,k=>{f=k;draw()})),box);draw()}
 
-function sec(){$('view').append(section('Mot de passe','Défini dans wrangler.toml (ADMIN_PASSWORD), puis npx wrangler deploy pour le changer.'),
+async function sec(){const st=await api('/state');const li=t=>mk('div',{className:'meta',style:'margin:.25rem 0',textContent:'• '+t});
+$('view').append(section('Mot de passe admin',st.weak?'⚠ Il est trop court ou encore celui par défaut : change-le.':'Il est vérifié côté serveur et n’est jamais stocké dans ton navigateur.',
+mk('div',{className:'meta',style:'margin-top:.6rem',textContent:'Pour le changer : modifie ADMIN_PASSWORD dans wrangler.toml puis lance npx wrangler deploy. Mieux : npx wrangler secret put ADMIN_PASSWORD, comme ça il n’est écrit dans aucun fichier.'}),
+mk('div',{className:'meta',style:'margin-top:.6rem',textContent:'Si ton dépôt GitHub est public, ne publie jamais un wrangler.toml qui contient ton mot de passe ou ton adresse mail.'})),
+section('Protections en place','Ce que le service fait déjà pour protéger cette console.',li('6 essais de connexion maximum par tranche de 15 minutes et par adresse IP'),li('Cookie de session HttpOnly, Secure et SameSite Strict'),li('Les actions sensibles refusent toute requête venant d’un autre site'),li('Les connexions refusées sont inscrites dans le journal')),
 section('Session','Tu restes connecté 7 jours.',mk('button',{className:'ghost',textContent:'Déconnexion',onclick:async()=>{await api('/logout',{});boot()}})))}
 boot();
 </script></body></html>

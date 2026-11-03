@@ -55,7 +55,7 @@ Page `/manage` : l'inscrit entre son mail, reçoit un lien personnel (valable 1 
 
 ## Console admin
 
-Va sur `/admin` juste après le déploiement : au premier accès, tu choisis ton mot de passe admin (fais-le tout de suite). Ensuite tout se règle depuis la console : clé Brevo, adresse expéditeur, token Hetzner, webhook Discord, pause des alertes, liste des inscrits, scan manuel et mail de test. Les valeurs sont stockées dans le KV, plus besoin de `wrangler secret`.
+Va sur `/admin` juste après le déploiement : tu te connectes avec le mot de passe défini dans `ADMIN_PASSWORD` (`wrangler.toml`, ou mieux `npx wrangler secret put ADMIN_PASSWORD`). Change la valeur par défaut avant de déployer, et ne publie jamais un `wrangler.toml` qui contient ton vrai mot de passe. Ensuite tout se règle depuis la console : clé Brevo, adresse expéditeur, token Hetzner, webhook Discord, pause des alertes, liste des inscrits, scan manuel et mail de test. Les valeurs sont stockées dans le KV, plus besoin de `wrangler secret`.
 
 ## Cacher ton adresse perso dans les mails
 

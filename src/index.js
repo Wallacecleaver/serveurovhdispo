@@ -343,7 +343,7 @@ async function manage(request, env, cfg, path, ctx) {
 async function admin(request, env, path) {
   // le mot de passe admin vient de wrangler.toml ([vars] ADMIN_PASSWORD)
   const pw = String(env.ADMIN_PASSWORD || '');
-  if (path === '/state') return json({ setup: true, configured: !!pw, authed: await authed(request, env) });
+  if (path === '/state') { const a = await authed(request, env); return json({ setup: true, configured: !!pw, authed: a, ...(a ? { weak: pw === 'CHANGE_MOI' || pw.length < 10 } : {}) }); }
   const body = request.method === 'POST' ? await request.json().catch(() => ({})) : {};
   const ip = request.headers.get('cf-connecting-ip') || 'x';
   if (path === '/login' && request.method === 'POST') {
