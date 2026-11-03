@@ -65,3 +65,5 @@ td.cell details{border:0;padding:0}td.cell summary{cursor:pointer;color:var(--fg
 .by{margin-top:.8rem;padding:.8rem .6rem 0;border-top:1px solid var(--line);color:var(--mut);font-size:.8rem}
 .by a{color:var(--c1);font-weight:700;text-decoration:none}.by a:hover{text-decoration:underline}.hrt{color:var(--ko)}
 #app>.by{margin-top:1.2rem;border-top:0;padding-left:0}
+
+.sidebrand{display:flex;align-items:center;gap:.6rem;padding:.2rem .4rem .6rem}.sidebrand img{border-radius:22%;filter:drop-shadow(0 4px 14px rgba(138,92,255,.4))}.sidebrand b{padding:0}
