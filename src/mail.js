@@ -26,7 +26,7 @@ const TERMS = `Radar serveurs est un service gratuit et indépendant, créé par
 
 function layout({ preheader, title, hero, body, publicUrl, unsubUrl }) {
   const site = publicUrl || '';
-  const logo = /^https:\/\//.test(site) ? `<img src="${esc(site)}/mail/radar.png" width="44" height="44" alt="&#9673;" style="display:block;border:0;outline:none;width:44px;height:44px;">` : `<span style="font-size:34px;line-height:44px;color:${C.cy};">&#9673;</span>`;
+  const logo = /^https:\/\//.test(site) ? `<img src="${esc(site)}/mail/logo.png?v=3" width="44" height="44" alt="&#9673;" style="display:block;border:0;outline:none;width:44px;height:44px;">` : `<span style="font-size:34px;line-height:44px;color:${C.cy};">&#9673;</span>`;
   const link = (href, label) => `<a href="${esc(href)}" style="color:${C.mut};text-decoration:underline;">${label}</a>`;
   const links = [site && link(`${site}/conditions`, 'Conditions d&rsquo;utilisation'), site && link(site, 'Le site'), site && link(`${site}/manage`, 'G&eacute;rer mon alerte'), unsubUrl && link(unsubUrl, 'Se d&eacute;sinscrire')].filter(Boolean).join(`<span style="color:${C.dim};">&nbsp;&nbsp;&middot;&nbsp;&nbsp;</span>`);
   return `<!doctype html><html lang="fr" xmlns="http://www.w3.org/1999/xhtml"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="dark"><meta name="supported-color-schemes" content="dark"><title>${esc(title)}</title></head>
